@@ -1,0 +1,41 @@
+# Windows system folders
+AppData/
+Application Data/
+Cookies/
+Local Settings/
+My Documents/
+NetHood/
+PrintHood/
+Recent/
+SendTo/
+Start Menu/
+Templates/
+Contacts/
+Favorites/
+Links/
+Searches/
+Saved Games/
+Videos/
+Music/
+Documents/My Music/
+Documents/My Pictures/
+Documents/My Videos/
+IntelGraphicsProfiles/
+OneDrive/
+OneDrive - Ro Bovines Inc/
+
+# Windows user profile files
+NTUSER.DAT*
+ntuser.dat.*
+ntuser.ini
+desktop.ini
+
+# IDE/Editor files
+.cursor/
+*.code-workspace
+
+# Other files not needed for the game
+CoolPotentialError.html
+wowitworks.html
+Downloads/
+
