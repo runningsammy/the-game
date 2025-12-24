@@ -32,7 +32,6 @@ desktop.ini
 
 # IDE/Editor files
 .cursor/
-*.code-workspace
 
 # Temporary files and one-off scripts
 tmp/

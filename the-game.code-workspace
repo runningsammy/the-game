@@ -1,0 +1,202 @@
+{
+  "folders": [
+    {
+      "path": ".",
+      "name": "The Game"
+    }
+  ],
+  "settings": {
+    // Editor Settings
+    "editor.formatOnSave": true,
+    "editor.defaultFormatter": "esbenp.prettier-vscode",
+    "editor.tabSize": 2,
+    "editor.insertSpaces": true,
+    "editor.wordWrap": "on",
+    "editor.minimap.enabled": true,
+    "editor.bracketPairColorization.enabled": true,
+    "editor.guides.bracketPairs": true,
+    "editor.inlineSuggest.enabled": true,
+    "editor.suggestSelection": "first",
+    "editor.quickSuggestions": {
+      "strings": true
+    },
+    
+    // File Settings
+    "files.autoSave": "afterDelay",
+    "files.autoSaveDelay": 1000,
+    "files.trimTrailingWhitespace": true,
+    "files.insertFinalNewline": true,
+    "files.exclude": {
+      "**/.git": true,
+      "**/.DS_Store": true,
+      "**/node_modules": true,
+      "**/.playwright-mcp": false
+    },
+    "files.associations": {
+      "*.piskel": "json"
+    },
+    
+    // JavaScript/HTML Settings
+    "[javascript]": {
+      "editor.defaultFormatter": "esbenp.prettier-vscode",
+      "editor.formatOnSave": true
+    },
+    "[html]": {
+      "editor.defaultFormatter": "esbenp.prettier-vscode",
+      "editor.formatOnSave": true
+    },
+    "[json]": {
+      "editor.defaultFormatter": "esbenp.prettier-vscode"
+    },
+    
+    // Prettier Settings
+    "prettier.singleQuote": true,
+    "prettier.semi": true,
+    "prettier.tabWidth": 2,
+    "prettier.printWidth": 80,
+    
+    // Live Server Settings
+    "liveServer.settings.donotShowInfoMsg": true,
+    "liveServer.settings.port": 5500,
+    "liveServer.settings.CustomBrowser": "chrome",
+    "liveServer.settings.root": "/",
+    
+    // Git Settings
+    "git.enableSmartCommit": true,
+    "git.confirmSync": false,
+    "git.autofetch": true,
+    
+    // Search Settings
+    "search.exclude": {
+      "**/node_modules": true,
+      "**/.git": true,
+      "**/.playwright-mcp": true
+    },
+    
+    // Cursor AI Settings
+    "cursor.chat.defaultModel": "claude-sonnet-4.5",
+    "cursor.general.enableShadowWorkspace": true,
+    
+    // Image Preview Settings
+    "gutterpreview.imagePreviewMaxHeight": 100,
+    "gutterpreview.showimagepreviewongutter": true,
+    
+    // Terminal Settings
+    "terminal.integrated.defaultProfile.windows": "Git Bash",
+    "terminal.integrated.fontSize": 14,
+    
+    // Emmet Settings
+    "emmet.includeLanguages": {
+      "javascript": "javascriptreact"
+    },
+    "emmet.triggerExpansionOnTab": true
+  },
+  "extensions": {
+    "recommendations": [
+      // Core Development
+      "ritwickdey.liveserver",
+      "esbenp.prettier-vscode",
+      
+      // Image & Asset Management
+      "kisstkondoros.vscode-gutter-preview",
+      "jock.svg",
+      
+      // HTML & CSS
+      "formulahendry.auto-rename-tag",
+      "ecmel.vscode-html-css",
+      "pranaygp.vscode-css-peek",
+      
+      // JavaScript
+      "xabikos.javascriptsnippets",
+      "dbaeumer.vscode-eslint",
+      
+      // Code Quality & Navigation
+      "aaron-bond.better-comments",
+      "oderwat.indent-rainbow",
+      "christian-kohler.path-intellisense",
+      "wayou.vscode-todo-highlight",
+      
+      // Git & Version Control
+      "eamodio.gitlens",
+      "mhutchie.git-graph",
+      
+      // API & Testing
+      "rangav.vscode-thunder-client",
+      
+      // Utilities
+      "gruntfuggly.todo-tree",
+      "streetsidesoftware.code-spell-checker",
+      "usernamehw.errorlens"
+    ]
+  },
+  "launch": {
+    "version": "0.2.0",
+    "configurations": [
+      {
+        "type": "chrome",
+        "request": "launch",
+        "name": "Launch Game in Chrome",
+        "file": "${workspaceFolder}/game.html"
+      },
+      {
+        "type": "node",
+        "request": "launch",
+        "name": "Start Node Server",
+        "program": "${workspaceFolder}/server.js",
+        "console": "integratedTerminal"
+      }
+    ]
+  },
+  "tasks": {
+    "version": "2.0.0",
+    "tasks": [
+      {
+        "label": "Open Game in Browser",
+        "type": "shell",
+        "command": "./scripts/open-game.sh",
+        "problemMatcher": []
+      },
+      {
+        "label": "Start Server",
+        "type": "shell",
+        "command": "./scripts/start-server.sh",
+        "problemMatcher": [],
+        "isBackground": true
+      },
+      {
+        "label": "Start Node Server",
+        "type": "shell",
+        "command": "node server.js",
+        "problemMatcher": [],
+        "isBackground": true
+      },
+      {
+        "label": "Optimize PNG Images",
+        "type": "shell",
+        "command": "for file in *.png; do pngquant --quality=65-80 --ext .png --force \"$file\"; done",
+        "problemMatcher": []
+      },
+      {
+        "label": "Create Sprite Sheet Info",
+        "type": "shell",
+        "command": "identify -format '%f: %wx%h\\n' *.png",
+        "problemMatcher": []
+      },
+      {
+        "label": "Git: Quick Commit",
+        "type": "shell",
+        "command": "git add . && git commit -m '${input:commitMessage}'",
+        "problemMatcher": []
+      }
+    ],
+    "inputs": [
+      {
+        "id": "commitMessage",
+        "type": "promptString",
+        "description": "Enter commit message",
+        "default": "Update game files"
+      }
+    ]
+  }
+}
+

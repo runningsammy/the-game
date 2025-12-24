@@ -1,0 +1,36 @@
+{
+  "recommendations": [
+    // Live development
+    "ritwickdey.liveserver",
+    
+    // Code formatting & quality
+    "esbenp.prettier-vscode",
+    "aaron-bond.better-comments",
+    "wayou.vscode-todo-highlight",
+    
+    // JavaScript development
+    "xabikos.javascriptsnippets",
+    "christian-kohler.path-intellisense",
+    
+    // Visual aids
+    "kisstkondoros.vscode-gutter-preview",
+    "coenraads.bracket-pair-colorizer-2",
+    
+    // HTML/CSS helpers
+    "formulahendry.auto-rename-tag",
+    "ecmel.vscode-html-css",
+    
+    // Git & version control
+    "eamodio.gitlens",
+    
+    // API testing
+    "rangav.vscode-thunder-client",
+    
+    // Markdown editing
+    "yzhang.markdown-all-in-one",
+    
+    // Shader support (for future WebGL)
+    "slevesque.shader"
+  ]
+}
+

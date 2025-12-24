@@ -1,0 +1,499 @@
+# The Game - Cursor Rules
+
+## Project Overview
+
+A 2D pixel art adventure game built with vanilla JavaScript and HTML5 Canvas.
+Single-file architecture (game.html) with external assets.
+
+**IMPORTANT: This is a learning project for a novice programmer.**
+
+- Code should be well-commented and educational
+- Prioritize clarity over cleverness
+- Explain concepts and patterns
+- Break down complex logic into understandable steps
+
+## Code Style
+
+### JavaScript
+
+- Use ES6+ features (const/let, arrow functions, template literals)
+- Prefer functional programming patterns where appropriate
+- Keep functions small and focused (max ~50 lines)
+- Use descriptive variable names (no single letters except loop counters)
+- **Comment generously** - explain WHY, not just WHAT
+- Add section headers for major code blocks
+- Explain game programming concepts inline
+- Document function parameters and return values
+- Note any tricky math or algorithms
+
+### Formatting
+
+- 2 spaces for indentation
+- Single quotes for strings
+- Semicolons required
+- Max line length: 80 characters (flexible for readability)
+
+### Naming Conventions
+
+```javascript
+// Variables and functions: camelCase
+const playerSpeed = 5;
+function updatePlayerPosition() {}
+
+// Constants: UPPER_SNAKE_CASE
+const MAX_HEALTH = 100;
+const TILE_SIZE = 32;
+
+// Objects/Classes: PascalCase (if needed)
+const GameState = {};
+```
+
+## Game Architecture
+
+### Canvas Rendering
+
+- Always use `ctx.save()` and `ctx.restore()` for transformations
+- Enable `imageSmoothingEnabled = false` for pixel art
+- Use `image-rendering: pixelated` in CSS
+
+### Coordinate System
+
+```javascript
+// WORLD COORDINATES: Where things actually are in the game world
+// Example: Player is at x=1200, y=800 in a 2400x2000 world
+
+// SCREEN COORDINATES: Where to draw on the visible canvas
+// Example: Canvas is 800x600, we only see a portion of the world
+
+// CAMERA: Determines which part of the world we're looking at
+// To draw something: screenX = worldX - camera.x
+
+// Always translate world → screen for rendering:
+const screenX = sprite.worldX - camera.x;
+const screenY = sprite.worldY - camera.y;
+ctx.drawImage(sprite, screenX, screenY);
+```
+
+### Game Loop Pattern
+
+```javascript
+// The main game loop - runs ~60 times per second
+// This is the heartbeat of your game
+function gameLoop(timestamp) {
+  // 1. Update game state (physics, AI, input)
+  //    Calculate new positions, check collisions, etc.
+
+  // 2. Clear canvas (wipe the screen clean)
+  //    Prepare for the next frame
+
+  // 3. Render world (draw everything)
+  //    Paint sprites, backgrounds, effects
+
+  // 4. Render UI (draw interface on top)
+  //    Health bars, score, menus, etc.
+
+  // Request the next frame (creates smooth animation)
+  requestAnimationFrame(gameLoop);
+}
+```
+
+### State Management
+
+- Keep game state in clear, organized objects
+- Avoid global variables (use IIFE or modules)
+- Separate concerns: rendering, logic, input handling
+
+## Asset Guidelines
+
+### Sprites
+
+- Location: `assets/sprites/`
+- Format: PNG with transparency
+- Naming: `kebab-case.png` (e.g., `player-walk-1.png`)
+- Size: Multiples of 16px (16x16, 32x32, 48x48)
+- Optimize with pngquant before committing
+
+### Loading Assets
+
+```javascript
+// Create a new image object to hold our sprite
+const sprite = new Image();
+
+// Tell the browser where to load the image from
+sprite.src = 'assets/sprites/sprite-name.png';
+
+// Disable smoothing to keep pixels crisp (important for pixel art!)
+// Without this, the browser will blur your sprites
+sprite.imageSmoothingEnabled = false;
+```
+
+## Performance
+
+### Optimization Rules
+
+- Only render what's visible in viewport
+- Use object pooling for frequently created/destroyed objects
+- Avoid creating objects in the game loop
+- Cache calculations when possible
+- Use requestAnimationFrame, never setInterval
+
+### Collision Detection
+
+- Use spatial partitioning for many objects
+- AABB (Axis-Aligned Bounding Box) for simple collisions
+- Keep collision checks in O(n) or better
+
+## UI/UX Design
+
+### Visual Style
+
+- Pixel art aesthetic (crisp, no anti-aliasing)
+- Dark theme with high contrast
+- Consistent color palette
+- Readable pixel fonts or system fonts
+
+### Controls
+
+- WASD or Arrow keys for movement
+- E for interaction
+- ESC for menus/pause
+- Mouse for UI elements
+- Show key hints in UI
+
+### Feedback
+
+- Visual feedback for all interactions
+- Smooth camera following (lerp)
+- Clear state changes (animations, sounds)
+- Responsive controls (no input lag)
+
+## File Organization
+
+### Project Structure
+
+```
+the-game/
+├── assets/sprites/    # All PNG sprites
+├── assets/piskel/     # Source files
+├── docs/              # Documentation only
+├── scripts/           # Permanent bash scripts only
+├── tmp/               # Temporary files, one-off scripts (gitignored)
+├── game.html          # Main game file
+├── server.js          # Simple HTTP server
+└── README.md          # Project overview
+```
+
+### What NOT to Create
+
+- ❌ **No temporary summary/status/documentation files** (teaches bad habits)
+- ❌ No Windows batch/PowerShell scripts in `scripts/` (bash only for permanent scripts)
+- ❌ No build tools (keep it simple)
+- ❌ No node_modules (vanilla JS only)
+- ❌ No "progress reports" or "setup guides" markdown files
+- ❌ No redundant documentation that duplicates README/JOURNAL
+
+### Temporary Files
+
+- ✅ One-off scripts, test files, temporary work → `tmp/` folder (gitignored)
+- ✅ Permanent, reusable scripts → `scripts/` folder (committed to git)
+
+**Why?** As a novice, you need to learn proper file organization from the start.
+Every file should have a clear purpose and place in the project.
+
+## Git Workflow
+
+### Commit Best Practices
+
+**Rationale:** Good git hygiene makes debugging easier, helps you understand what changed when, and teaches professional development practices. Small, logical commits are like save points in a game - you can always go back to a working state.
+
+#### Commit Size & Grouping
+
+- **Small, logical commits** - One feature/fix per commit
+- **Group related changes** - Files that change together, commit together
+- **Test before committing** - Make sure the game still works
+- **Commit often** - Don't wait until end of day with 50 changes
+
+#### Commit Messages
+
+Use imperative mood (like giving a command):
+
+```bash
+# Good commit messages
+git commit -m "Add player sprint mechanic with stamina system"
+git commit -m "Reorganize sprites into assets folder"
+git commit -m "Fix collision detection for circular NPCs"
+git commit -m "Update README with new folder structure"
+
+# Bad commit messages
+git commit -m "fixed stuff"
+git commit -m "changes"
+git commit -m "idk lol"
+git commit -m "Added some features and fixed bugs and updated docs"
+```
+
+**Format:** `<action> <what> [optional: why/context]`
+
+Examples:
+- `Add <feature>` - New functionality
+- `Fix <bug>` - Bug fixes
+- `Update <thing>` - Modifications to existing code
+- `Refactor <component>` - Code cleanup/reorganization
+- `Remove <thing>` - Deletions
+
+#### Logical Commit Groups
+
+When you have many changes, group by:
+
+1. **By feature area** - "Reorganize assets and update paths"
+2. **By type** - "Add configuration files for development"
+3. **By dependency** - Commit A must happen before commit B
+
+**Example workflow:**
+```bash
+# After reorganizing project
+git add assets/ game.html
+git commit -m "Reorganize sprites into assets folder and update paths"
+
+git add scripts/ .gitignore
+git commit -m "Convert scripts to bash and add tmp folder to gitignore"
+
+git add .cursorrules .vscode/ the-game.code-workspace
+git commit -m "Add Cursor configuration and workspace settings"
+
+git add README.md docs/
+git commit -m "Update documentation for new project structure"
+```
+
+#### Before Committing
+
+- [ ] Remove personal info (usernames, tokens, paths)
+- [ ] Remove temporary/test files
+- [ ] Check `.gitignore` is working (no tmp/ files, etc.)
+- [ ] Test that the game still runs
+- [ ] Review what you're committing: `git status` and `git diff`
+
+### What to Commit
+
+- Source code (game.html, server.js)
+- Assets (sprites, piskel files)
+- Documentation (README, JOURNAL)
+- Scripts (bash only)
+- Configuration (.cursorrules, .vscode/, workspace file)
+
+### What NOT to Commit
+
+- `.playwright-mcp/` (browser automation temp files)
+- `tmp/` folder (temporary work)
+- `node_modules/` (if any)
+- OS files (`.DS_Store`, `Thumbs.db`)
+- Personal info (usernames, tokens, local paths)
+- Editor configs (except workspace file)
+
+## Development Workflow
+
+### Starting Development
+
+```bash
+./scripts/start-server.sh  # Auto-opens browser
+```
+
+### Testing Changes
+
+- Refresh browser (F5)
+- Check browser console for errors
+- Test on different screen sizes
+
+### Adding Features
+
+1. Plan the feature (comment outline)
+2. Implement in small steps
+3. Test frequently
+4. Optimize if needed
+5. Document if complex
+
+## AI Assistant Behavior
+
+### Core Principles
+
+This is a **learning project for a novice programmer**. Your role is to teach, not just solve problems.
+
+**Context:** The user is learning game development, Linux/command-line, and proper software practices. They need to understand WHY things work, not just HOW. Building good habits now (file organization, commenting, testing) will serve them throughout their career. Your guidance shapes their development practices.
+
+**Goal:** Help them become an independent developer who can reason through problems, make informed decisions, and write maintainable code.
+
+### Recommended Behaviors
+
+#### 1. Educational Code
+
+**Rationale:** Comments teach the user to think about code intent. Novices often struggle to understand WHY code works, not just WHAT it does. Well-commented code becomes a learning resource they can reference later.
+
+- Add educational comments to new code explaining WHY
+- Break down complex logic into understandable steps
+- Document function parameters and return values
+- Explain game programming concepts (lerp, AABB, etc.)
+- Use descriptive variable names
+
+#### 2. Teaching Through Questions
+
+**Rationale:** Developers must learn to evaluate options and make informed decisions. Giving answers without context creates dependency. Asking questions builds critical thinking and helps users understand the reasoning behind technical choices.
+
+- Ask clarifying questions before implementing
+- Present options: "We could do X or Y - what makes sense?"
+- Explain trade-offs between approaches
+- Guide user to make their own coding decisions
+- Keep questions appropriate for novice level
+
+#### 3. Verification
+
+**Rationale:** Novices often assume commands succeeded without checking. This leads to confusion when things don't work. Modeling verification behavior teaches debugging skills and attention to detail - critical for professional development.
+
+- Verify commands worked (check output)
+- Verify servers started (test with request/screenshot)
+- Verify files created (check they exist)
+- Test that game still works after changes
+- Check results rather than assume success
+
+#### 4. File Management
+
+**Rationale:** File organization is a fundamental skill novices must learn early. Poor habits (scattered temp files, unclear structure) compound over time. A clean project structure teaches professionalism and makes codebases maintainable.
+
+- Create files that belong permanently in the project
+- Use existing files (README.md, JOURNAL.md) for documentation
+- Explain why files are organized a certain way
+- Put temporary/one-off work in tmp/ folder (gitignored)
+
+### Things to Avoid
+
+#### File Organization
+
+**Rationale:** Temporary documentation files teach novices that cluttering projects with status files is normal. Professional projects maintain clean structures. Temporary work belongs in designated temp folders, not scattered throughout.
+
+Avoid creating temporary documentation files:
+
+- Summary/status files
+- Progress reports
+- Setup guides
+- Files that duplicate existing documentation
+
+Use tmp/ for temporary work instead.
+
+#### Code Practices
+
+**Rationale:** The user is learning fundamentals. Advanced patterns without context create confusion. Simple, well-explained code builds understanding. The vanilla JS approach teaches core concepts without framework magic obscuring what's happening.
+
+Consider avoiding:
+
+- Advanced patterns without explanation (builds confusion, not understanding)
+- Assuming knowledge of game programming concepts (they're learning)
+- Skipping comments to save space (this is educational, not production)
+- Over-engineering solutions (simplicity aids learning)
+- Adding dependencies without discussion (teaches dependency management)
+- Changing the single-file architecture (consistency aids learning)
+- Adding frameworks (vanilla JS teaches fundamentals)
+- Windows-specific scripts in scripts/ (cross-platform is better practice)
+
+### Response Format
+
+When helping:
+
+1. Explain the concept or problem
+2. Present options if multiple approaches exist
+3. Implement with educational comments
+4. Verify the implementation worked
+5. Explain what was done and why
+
+## Common Patterns (With Learning Comments)
+
+### Camera Following
+
+```javascript
+// Smooth camera movement using linear interpolation (lerp)
+// This creates a "following" effect rather than instant snapping
+// The smaller the lerp value, the slower/smoother the follow
+camera.x += (target.x - camera.x) * camera.followLerp;
+camera.y += (target.y - camera.y) * camera.followLerp;
+```
+
+### Collision Detection
+
+```javascript
+// AABB (Axis-Aligned Bounding Box) collision detection
+// Returns true if two rectangles overlap
+// Works by checking if rectangles DON'T overlap, then inverting
+function checkCollision(a, b) {
+  return (
+    a.x < b.x + b.width && // a's left is left of b's right
+    a.x + a.width > b.x && // a's right is right of b's left
+    a.y < b.y + b.height && // a's top is above b's bottom
+    a.y + a.height > b.y
+  ); // a's bottom is below b's top
+}
+```
+
+### Input Handling
+
+```javascript
+// Simple key state tracking
+// Store which keys are currently pressed
+const keys = {};
+
+// When key is pressed down, mark it as true
+window.addEventListener('keydown', (e) => (keys[e.key] = true));
+
+// When key is released, mark it as false
+window.addEventListener('keyup', (e) => (keys[e.key] = false));
+
+// Now you can check: if (keys['w']) { moveUp(); }
+```
+
+## Debugging
+
+### Console Logging
+
+- Use descriptive messages
+- Remove debug logs before committing
+- Use `console.table()` for objects
+
+### Common Issues
+
+- Sprites not loading: Check paths (`assets/sprites/`)
+- Collision bugs: Draw bounding boxes for debugging
+- Performance: Check FPS, profile with DevTools
+
+## Learning Resources & Concepts
+
+### Key Game Programming Concepts to Understand
+
+- **Game Loop**: The continuous cycle of update → render → repeat
+- **Delta Time**: Time between frames (for smooth movement)
+- **Lerp (Linear Interpolation)**: Smooth transitions between values
+- **AABB Collision**: Rectangle overlap detection
+- **Sprite**: A 2D image/character in the game
+- **Canvas Context**: The drawing API (ctx) for rendering
+- **Event Listeners**: Responding to keyboard/mouse input
+- **requestAnimationFrame**: Browser's way to create smooth animations
+
+### When You See These Patterns
+
+- `ctx.save()` / `ctx.restore()`: Saves/restores drawing state
+- `+=` in game loop: Accumulating movement/changes over time
+- `* deltaTime`: Making movement frame-rate independent
+- `if (keys['w'])`: Checking if a key is currently pressed
+- `Math.random()`: Generating random numbers for variety
+- `%` (modulo): Wrapping values, cycling through arrays
+
+### Good Questions to Ask
+
+- "Why do we use requestAnimationFrame instead of setInterval?"
+- "What does this math do and why?"
+- "How does collision detection work?"
+- "What's the difference between world and screen coordinates?"
+- "Why do we clear the canvas every frame?"
+
+## Notes
+
+- Keep the codebase simple and maintainable
+- Prioritize readability and learning over cleverness
+- Game should work without a build step
+- Focus on gameplay, not tooling
+- **Ask questions!** There are no dumb questions in learning
