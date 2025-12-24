@@ -207,57 +207,57 @@
       
       // Load pot sprite from PNG image
       const potSprite = new Image();
-      potSprite.src = 'pot.png';
+      potSprite.src = 'assets/sprites/pot.png';
       potSprite.imageSmoothingEnabled = false; // Pixelated rendering
       
       // Load brush sprite from PNG image
       const brushSprite = new Image();
-      brushSprite.src = 'brush.png';
+      brushSprite.src = 'assets/sprites/brush.png';
       brushSprite.imageSmoothingEnabled = false; // Pixelated rendering
       
       // Load dirt sprite from PNG image
       const dirtSprite = new Image();
-      dirtSprite.src = 'dirt.png';
+      dirtSprite.src = 'assets/sprites/dirt.png';
       dirtSprite.imageSmoothingEnabled = false; // Pixelated rendering
       
       // Load money border sprite from PNG image
       const moneyBorderSprite = new Image();
-      moneyBorderSprite.src = 'money_border.png';
+      moneyBorderSprite.src = 'assets/sprites/money_border.png';
       moneyBorderSprite.imageSmoothingEnabled = false; // Pixelated rendering
       
       // Load old guy sprite from PNG image
       const oldGuySprite = new Image();
-      oldGuySprite.src = 'oldguy.png';
+      oldGuySprite.src = 'assets/sprites/oldguy.png';
       oldGuySprite.imageSmoothingEnabled = false; // Pixelated rendering
       
       // Load shopkeeper sprite from PNG image
       const shopkeeperSprite = new Image();
-      shopkeeperSprite.src = 'shopkeeper.png';
+      shopkeeperSprite.src = 'assets/sprites/shopkeeper.png';
       shopkeeperSprite.imageSmoothingEnabled = false; // Pixelated rendering
       
       // Load player sprites from PNG images
       const playerSpriteIdle = new Image();
-      playerSpriteIdle.src = 'player.png';
+      playerSpriteIdle.src = 'assets/sprites/player.png';
       playerSpriteIdle.imageSmoothingEnabled = false; // Pixelated rendering
       
       const playerSpriteBack = new Image();
-      playerSpriteBack.src = 'player_back.png';
+      playerSpriteBack.src = 'assets/sprites/player_back.png';
       playerSpriteBack.imageSmoothingEnabled = false; // Pixelated rendering
       
       const playerSpriteBackWalk1 = new Image();
-      playerSpriteBackWalk1.src = 'player_back_walk1.png';
+      playerSpriteBackWalk1.src = 'assets/sprites/player_back_walk1.png';
       playerSpriteBackWalk1.imageSmoothingEnabled = false; // Pixelated rendering
       
       const playerSpriteBackWalk2 = new Image();
-      playerSpriteBackWalk2.src = 'player_back_walk2.png';
+      playerSpriteBackWalk2.src = 'assets/sprites/player_back_walk2.png';
       playerSpriteBackWalk2.imageSmoothingEnabled = false; // Pixelated rendering
       
       const playerSpriteWalk1 = new Image();
-      playerSpriteWalk1.src = 'player_walk1.png';
+      playerSpriteWalk1.src = 'assets/sprites/player_walk1.png';
       playerSpriteWalk1.imageSmoothingEnabled = false; // Pixelated rendering
       
       const playerSpriteWalk2 = new Image();
-      playerSpriteWalk2.src = 'player_walk2.png';
+      playerSpriteWalk2.src = 'assets/sprites/player_walk2.png';
       playerSpriteWalk2.imageSmoothingEnabled = false; // Pixelated rendering
       
       // Walking animation state
@@ -1239,8 +1239,8 @@
       }
       
       // Load shovel sprites for each tier
-      loadShovelSprite(1, 'shovel.png'); // Simple shovel
-      loadShovelSprite(2, 'iron-shovel.png'); // Iron Shovel
+      loadShovelSprite(1, 'assets/sprites/shovel.png'); // Simple shovel
+      loadShovelSprite(2, 'assets/sprites/iron-shovel.png'); // Iron Shovel
       // Add more shovel sprites as needed for other tiers
 
       function drawFlora() {
@@ -1862,7 +1862,7 @@
           let sprite = shovelSprites[item.tier];
           // If sprite not loaded yet, load it now
           if (!sprite) {
-            const spriteName = item.name.toLowerCase().replace(/\s+/g, '-') + '.png';
+            const spriteName = 'assets/sprites/' + item.name.toLowerCase().replace(/\s+/g, '-') + '.png';
             sprite = loadShovelSprite(item.tier, spriteName);
           }
           // Add shovel to equipment slot
