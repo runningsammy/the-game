@@ -38,6 +38,9 @@ tmp/
 *.tmp
 *.temp
 
+# Agent coding journals (gitignored, not source controlled)
+.journals/
+
 # Personal learning notes (not part of project)
 notes/
 

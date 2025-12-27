@@ -178,6 +178,7 @@ the-game/
 ├── docs/              # Documentation only
 ├── scripts/           # Permanent bash scripts only
 ├── tmp/               # Temporary files, one-off scripts (gitignored)
+├── .journals/         # Agent coding journals (gitignored)
 ├── game.html          # Main game file
 ├── server.js          # Simple HTTP server
 └── README.md          # Project overview
@@ -199,6 +200,38 @@ the-game/
 
 **Why?** As a novice, you need to learn proper file organization from the start.
 Every file should have a clear purpose and place in the project.
+
+### Agent Coding Journals
+
+**Location:** `.journals/` folder (gitignored, not source controlled)
+
+**Purpose:** Point-in-time coding journals for AI agents to document learnings, status, and progress. These help agents catch up on project context when starting new sessions.
+
+**File Naming:** `YYYYMMDD-HHMMSS-short-desc` (e.g., `20241227-100530-setup-node-python.md`)
+
+**Content Guidelines:**
+- **Very succinct and information-dense** (tokens are at a premium)
+- **No PII, personal details, or secrets** (not source controlled, but still private)
+- Focus on technical learnings, architectural decisions, implementation notes
+- Document what was done, why, and any gotchas or important context
+- Written for agents, not humans (can be terse but clear)
+
+**Usage:**
+- Created when explicitly asked by the user
+- Agent should read the latest journal(s) when starting to catch up on progress
+- Multiple journals can exist (one per session/milestone)
+- Keep entries concise - these are reference documents, not prose
+
+**Example journal entry:**
+```markdown
+# Setup portable Node.js/Python
+
+- Installed Node.js v20.18.0 to ~/bin/node (portable, no admin)
+- Installed Python 3.12.7 to ~/bin/python (portable, no admin)
+- Updated .bashrc/.bash_profile with PATH exports
+- Simple prompt: PS1='$ '
+- Server runs on port 8080, accessible at localhost:8080/game.html
+```
 
 ## Git Workflow
 
@@ -284,6 +317,7 @@ git commit -m "Update documentation for new project structure"
 
 - `.playwright-mcp/` (browser automation temp files)
 - `tmp/` folder (temporary work)
+- `.journals/` folder (agent coding journals, gitignored)
 - `node_modules/` (if any)
 - OS files (`.DS_Store`, `Thumbs.db`)
 - Personal info (usernames, tokens, local paths)
@@ -408,6 +442,8 @@ This is a **learning project for a novice programmer**. Your role is to teach, n
 - Use existing files (README.md, JOURNAL.md) for documentation
 - Explain why files are organized a certain way
 - Put temporary/one-off work in tmp/ folder (gitignored)
+- Create journals in `.journals/` when explicitly asked by user
+- Read latest journal(s) when starting to catch up on project context
 
 ### Things to Avoid
 
