@@ -70,7 +70,7 @@
       <canvas id="game" width="800" height="500" aria-label="Game canvas"></canvas>
     </main>
     </div>
-    
+
     <script>
     (function() {
       const canvas = document.getElementById('game');
@@ -79,7 +79,7 @@
       // Make the world larger than the canvas so a camera makes sense
       const world = {
         width: 2400,
-        height: 2000, // Increased height to prevent bottom tiles from being cut off
+        height: 2064, // Increased to ensure bottom row tiles are fully visible (2000 + 64 for extra margin)
         bg: '#0f1226'
       };
 
@@ -107,31 +107,31 @@
         const gridCols = Math.ceil(world.width / cellSize);
         const gridRows = Math.ceil(world.height / cellSize);
         const grid = Array.from({ length: gridRows }, () => Array(gridCols).fill(null).map(() => []));
-        
+
         function getGridCell(x, y) {
           const col = Math.floor(x / cellSize);
           const row = Math.floor(y / cellSize);
           return { row: Math.max(0, Math.min(gridRows - 1, row)), col: Math.max(0, Math.min(gridCols - 1, col)) };
         }
-        
+
         for (let i = 0; i < count; i++) {
           const size = randomRange(minSize, maxSize);
           const colliderRadius = size * 0.42;
           const requiredDistance = minDistance + colliderRadius;
           const requiredDistanceSq = requiredDistance * requiredDistance;
-          
+
           let x, y, valid = false;
           let placementAttempts = 0;
-          
+
           while (!valid && placementAttempts < maxAttempts) {
             placementAttempts++;
             x = randomRange(margin, world.width - margin);
             y = randomRange(margin, world.height - margin);
-            
+
             // Check only nearby cells in spatial grid
             const cell = getGridCell(x, y);
             valid = true;
-            
+
             // Check cells in 3x3 area around the placement
             for (let dr = -1; dr <= 1 && valid; dr++) {
               for (let dc = -1; dc <= 1 && valid; dc++) {
@@ -151,7 +151,7 @@
               }
             }
           }
-          
+
           if (valid) {
             const tree = {
               x,
@@ -193,73 +193,79 @@
       const brushingMinigame = {
         active: false,
         dirtLevel: 1.0, // 0 = clean, 1.0 = fully dirty
-        redness: 0, // 0 = normal, 1.0 = broken (red)
+        redness: 0, // 0 = normal, 1.0 = fully red (gradual transition)
         timeHoldingSpace: 0, // Time spent holding space (in seconds)
         redTriggerTime: 0, // Random time between 5-10 seconds when dirt will turn red
+        timeSinceRed: 0, // Time since dirt started turning red (for perfect timing bonus)
+        redTransitionTime: 1.0, // 1 second for red gradient transition
+        perfectReleaseWindow: 0.5, // 0.5 seconds window for perfect release after fully red
         baseReward: 10, // Base money reward
         tileRow: null,
         tileCol: null,
-        brushX: 0, // X position of brush
+        brushX: 0, // X position of brush (animated)
         brushY: 0, // Y position of brush
+        brushOffset: 0, // Horizontal offset for back-and-forth animation
+        brushDirection: 1, // 1 = right, -1 = left
+        particles: [], // Array of dirt particles
         completed: false, // Whether the minigame was completed successfully
         broken: false // Whether the dirt broke (turned too red)
       };
-      
+
       // Load pot sprite from PNG image
       const potSprite = new Image();
       potSprite.src = 'assets/sprites/pot.png';
       potSprite.imageSmoothingEnabled = false; // Pixelated rendering
-      
+
       // Load brush sprite from PNG image
       const brushSprite = new Image();
       brushSprite.src = 'assets/sprites/brush.png';
       brushSprite.imageSmoothingEnabled = false; // Pixelated rendering
-      
+
       // Load dirt sprite from PNG image
       const dirtSprite = new Image();
       dirtSprite.src = 'assets/sprites/dirt.png';
       dirtSprite.imageSmoothingEnabled = false; // Pixelated rendering
-      
+
       // Load money border sprite from PNG image
       const moneyBorderSprite = new Image();
       moneyBorderSprite.src = 'assets/sprites/money_border.png';
       moneyBorderSprite.imageSmoothingEnabled = false; // Pixelated rendering
-      
+
       // Load old guy sprite from PNG image
       const oldGuySprite = new Image();
       oldGuySprite.src = 'assets/sprites/oldguy.png';
       oldGuySprite.imageSmoothingEnabled = false; // Pixelated rendering
-      
+
       // Load shopkeeper sprite from PNG image
       const shopkeeperSprite = new Image();
       shopkeeperSprite.src = 'assets/sprites/shopkeeper.png';
       shopkeeperSprite.imageSmoothingEnabled = false; // Pixelated rendering
-      
+
       // Load player sprites from PNG images
       const playerSpriteIdle = new Image();
       playerSpriteIdle.src = 'assets/sprites/player.png';
       playerSpriteIdle.imageSmoothingEnabled = false; // Pixelated rendering
-      
+
       const playerSpriteBack = new Image();
       playerSpriteBack.src = 'assets/sprites/player_back.png';
       playerSpriteBack.imageSmoothingEnabled = false; // Pixelated rendering
-      
+
       const playerSpriteBackWalk1 = new Image();
       playerSpriteBackWalk1.src = 'assets/sprites/player_back_walk1.png';
       playerSpriteBackWalk1.imageSmoothingEnabled = false; // Pixelated rendering
-      
+
       const playerSpriteBackWalk2 = new Image();
       playerSpriteBackWalk2.src = 'assets/sprites/player_back_walk2.png';
       playerSpriteBackWalk2.imageSmoothingEnabled = false; // Pixelated rendering
-      
+
       const playerSpriteWalk1 = new Image();
       playerSpriteWalk1.src = 'assets/sprites/player_walk1.png';
       playerSpriteWalk1.imageSmoothingEnabled = false; // Pixelated rendering
-      
+
       const playerSpriteWalk2 = new Image();
       playerSpriteWalk2.src = 'assets/sprites/player_walk2.png';
       playerSpriteWalk2.imageSmoothingEnabled = false; // Pixelated rendering
-      
+
       // Walking animation state
       let walkAnimationFrame = 0;
       const walkAnimationSpeed = 0.15; // How fast the animation cycles (lower = faster)
@@ -464,7 +470,7 @@
       function isTreeAtTile(row, col) {
         const tileCenterX = (col + 0.5) * tileSize;
         const tileCenterY = (row + 0.5) * tileSize;
-        
+
         for (let i = 0; i < flora.trees.length; i++) {
           const tree = flora.trees[i];
           const dx = tree.x - tileCenterX;
@@ -472,7 +478,7 @@
           const distSq = dx * dx + dy * dy;
           const treeRadius = tree.colliderRadius || tree.size * 0.42;
           const minDistSq = (tileSize / 2 + treeRadius) * (tileSize / 2 + treeRadius);
-          
+
           if (distSq < minDistSq) {
             return true;
           }
@@ -486,12 +492,12 @@
         tileMap[row] = [];
         for (let col = 0; col < tileCols; col++) {
           let def = pickTileDefinition();
-          
+
           // If redX tile was picked and there's a tree at this position, replace with grass
           if (def.name === 'redX' && isTreeAtTile(row, col)) {
             def = tileDefinitions.find(d => d.name === 'grass');
           }
-          
+
           tileMap[row][col] = {
             name: def.name,
             canvas: createTileCanvas(def.draw)
@@ -578,7 +584,9 @@
         x: world.width / 2 + 150, // To the right of spawn
         y: world.height - 40, // Same Y as spawn
         radius: 20,
-        dialogue: null // Current dialogue text
+        dialogue: null, // Current dialogue text
+        dialogueStage: 0, // Track which dialogue to show (0-5 for initial sequence)
+        hasCompletedIntro: false // Track if player has completed initial dialogue sequence
       };
 
       // Inventory system
@@ -622,11 +630,11 @@
             player.vy = 0;
           }
         }
-        
-        // Interaction key Q
-        if (e.code === 'KeyQ') {
+
+        // Interaction key Spacebar
+        if (e.code === 'Space') {
           e.preventDefault();
-          // Don't allow closing shop during minigame (minigame handles its own closing)
+          // Don't allow interaction during minigames (minigames use spacebar for their own mechanics)
           if (balancingMinigame.active || brushingMinigame.active) {
             return;
           }
@@ -647,7 +655,7 @@
             if (shopkeeper.dialogue) {
               advanceShopkeeperDialogue();
             } else if (oldGuy.dialogue) {
-              oldGuy.dialogue = null; // Close old guy dialogue
+              advanceOldGuyDialogue(); // Advance through dialogue stages
               player.vx = 0;
               player.vy = 0;
             }
@@ -656,7 +664,7 @@
             handleInteraction();
           }
         }
-        
+
         // Number keys for shop purchases
         if (shop.open) {
           const keyNum = parseInt(e.key);
@@ -678,7 +686,7 @@
 
       function update(dtMs) {
         const dt = (dtMs || 16.67) / 1000; // seconds
-        
+
         // Only update player movement if inventory is closed, shop is closed, dialogue is not showing, tutorial is not active, and minigame is not active
         if (!inventory.open && !shop.open && !shopkeeper.dialogue && !oldGuy.dialogue && !tutorial.active && !balancingMinigame.active && !brushingMinigame.active) {
           const wantsSprint = pressed('ShiftLeft') || pressed('ShiftRight');
@@ -720,7 +728,7 @@
         resolveTreeCollisions();
         resolveShopkeeperCollision();
         resolveOldGuyCollision();
-        
+
         // Update walking animation with speed based on sprinting
         const isMoving = Math.hypot(player.vx, player.vy) > 0.1;
         if (isMoving) {
@@ -752,7 +760,7 @@
           player.x = clamp(player.x, halfW, world.width - halfW);
           player.y = clamp(player.y, halfH, world.height - halfH);
         }
-        
+
         // Clear keyJustPressed at end of frame
         Object.keys(keyJustPressed).forEach(key => keyJustPressed[key] = false);
 
@@ -767,7 +775,7 @@
         const halfViewH = canvas.height / 2;
         camera.x = clamp(camera.x, halfViewW, world.width - halfViewW);
         camera.y = clamp(camera.y, halfViewH, world.height - halfViewH);
-        
+
         // Round camera to integer pixels to prevent sub-pixel jitter
         // This ensures the translate() call produces consistent pixel-aligned results
         camera.x = Math.round(camera.x);
@@ -783,7 +791,7 @@
         const step = 50;
         ctx.save();
         ctx.lineWidth = 1;
-        
+
         // Viewport culling: only draw grid lines visible on screen
         const halfCanvasW = canvas.width / 2;
         const halfCanvasH = canvas.height / 2;
@@ -791,12 +799,12 @@
         const viewTop = camera.y - halfCanvasH;
         const viewRight = camera.x + halfCanvasW;
         const viewBottom = camera.y + halfCanvasH;
-        
+
         const startX = Math.max(0, Math.floor(viewLeft / step) * step);
         const endX = Math.min(world.width, Math.ceil(viewRight / step) * step);
         const startY = Math.max(0, Math.floor(viewTop / step) * step);
         const endY = Math.min(world.height, Math.ceil(viewBottom / step) * step);
-        
+
         // Batch strokes by color to reduce state changes
         for (let x = startX; x <= endX; x += step) {
           ctx.strokeStyle = x % 200 === 0 ? 'rgba(139,111,71,0.18)' : 'rgba(139,111,71,0.08)'; // Brown grid
@@ -822,20 +830,21 @@
         const viewTop = camera.y - canvas.height / 2;
         const viewRight = camera.x + canvas.width / 2;
         const viewBottom = camera.y + canvas.height / 2;
-        
+
         const startRow = Math.max(0, Math.floor(viewTop / tileSize) - 1);
         const endRow = Math.min(tileRows - 1, Math.ceil(viewBottom / tileSize) + 1);
         const startCol = Math.max(0, Math.floor(viewLeft / tileSize) - 1);
         const endCol = Math.min(tileCols - 1, Math.ceil(viewRight / tileSize) + 1);
-        
+
         for (let row = startRow; row <= endRow; row++) {
           for (let col = startCol; col <= endCol; col++) {
             const tile = tileMap[row][col];
             if (tile && tile.canvas) {
               // Draw tiles at exact integer pixel positions to prevent seams
+              // Add 1px overlap to eliminate gaps between tiles
               const tileX = Math.floor(col * tileSize);
               const tileY = Math.floor(row * tileSize);
-              ctx.drawImage(tile.canvas, tileX, tileY);
+              ctx.drawImage(tile.canvas, tileX, tileY, tileSize + 1, tileSize + 1);
             }
           }
         }
@@ -846,21 +855,21 @@
         const playerRadius = player.radius; // Use cached radius
         const maxCheckDistance = 150;
         const maxCheckDistanceSq = maxCheckDistance * maxCheckDistance;
-        
+
         // Early exit optimization: use squared distances to avoid sqrt
         for (let i = 0; i < flora.trees.length; i++) {
           const tree = flora.trees[i];
           const dx = player.x - tree.x;
           const dy = player.y - tree.y;
           const distSq = dx * dx + dy * dy;
-          
+
           // Quick distance check first (no sqrt needed)
           if (distSq > maxCheckDistanceSq) continue;
-          
+
           const treeRadius = tree.colliderRadius;
           const minDist = treeRadius + playerRadius;
           const minDistSq = minDist * minDist;
-          
+
           if (distSq < minDistSq && distSq > 0) { // Avoid division by zero
             const dist = Math.sqrt(distSq);
             const overlap = minDist - dist;
@@ -878,7 +887,7 @@
         const distSq = dx * dx + dy * dy;
         const minDist = shopkeeper.radius + playerRadius;
         const minDistSq = minDist * minDist;
-        
+
         if (distSq < minDistSq && distSq > 0) {
           const dist = Math.sqrt(distSq);
           const overlap = minDist - dist;
@@ -895,7 +904,7 @@
         const distSq = dx * dx + dy * dy;
         const minDist = oldGuy.radius + playerRadius;
         const minDistSq = minDist * minDist;
-        
+
         if (distSq < minDistSq && distSq > 0) {
           const dist = Math.sqrt(distSq);
           const overlap = minDist - dist;
@@ -922,17 +931,43 @@
         }
       }
 
+      function advanceOldGuyDialogue() {
+        // Progress through the Old Guy's dialogue sequence
+        if (!oldGuy.hasCompletedIntro) {
+          // Initial dialogue sequence
+          oldGuy.dialogueStage++;
+
+          if (oldGuy.dialogueStage === 1) {
+            oldGuy.dialogue = 'Well, here we are. The newly discovered "Battle of the hills" historical site!';
+          } else if (oldGuy.dialogueStage === 2) {
+            oldGuy.dialogue = "It is time for you to uncover the history of this place!";
+          } else if (oldGuy.dialogueStage === 3) {
+            oldGuy.dialogue = "Are you ready?";
+          } else if (oldGuy.dialogueStage === 4) {
+            oldGuy.dialogue = "Dig up those holes with Spacebar!";
+          } else if (oldGuy.dialogueStage >= 5) {
+            // Completed the intro sequence
+            oldGuy.dialogue = null;
+            oldGuy.hasCompletedIntro = true;
+            oldGuy.dialogueStage = 0;
+          }
+        } else {
+          // After intro is complete, just close the "hurry up" message
+          oldGuy.dialogue = null;
+        }
+      }
+
       function handleInteraction() {
         // Don't interact if inventory is open
         if (inventory.open) {
           return;
         }
-        
+
         // Don't start new dialogue if one is already showing
         if (shopkeeper.dialogue || oldGuy.dialogue) {
           return;
         }
-        
+
         // Check if player is touching old guy (collision-based)
         const playerRadius = player.radius; // Use cached radius
         let dx = player.x - oldGuy.x;
@@ -940,38 +975,46 @@
         let distSq = dx * dx + dy * dy;
         let minDist = oldGuy.radius + playerRadius;
         let minDistSq = minDist * minDist;
-        
+
         // Allow interaction when very close (within collision distance + small buffer)
         if (distSq <= minDistSq * 1.2) {
-          oldGuy.dialogue = "Hi";
+          // Set dialogue based on whether intro is completed
+          if (!oldGuy.hasCompletedIntro) {
+            // Start the intro dialogue sequence
+            oldGuy.dialogueStage = 0;
+            oldGuy.dialogue = "Hello there!";
+          } else {
+            // Show the "hurry up" message after intro is done
+            oldGuy.dialogue = "What are you waiting for? Get going! Dig those holes with Spacebar!";
+          }
           // Kill momentum when opening dialogue
           player.vx = 0;
           player.vy = 0;
           return;
         }
-        
+
         // Check if player is touching shopkeeper (collision-based)
         dx = player.x - shopkeeper.x;
         dy = player.y - shopkeeper.y;
         distSq = dx * dx + dy * dy;
         minDist = shopkeeper.radius + playerRadius;
         minDistSq = minDist * minDist;
-        
+
         // Allow interaction when very close (within collision distance + small buffer)
         if (distSq <= minDistSq * 1.2) {
           shopkeeper.dialogue = "Hello";
           shopkeeper.dialogueStage = 1;
-          shopkeeper.dialogueTimer = 0; // Don't auto-close, wait for Q press
+          shopkeeper.dialogueTimer = 0; // Don't auto-close, wait for Spacebar press
           // Kill momentum when opening dialogue
           player.vx = 0;
           player.vy = 0;
           return;
         }
-        
+
         // Check if player is on red X tile
         const col = Math.floor(player.x / tileSize);
         const row = Math.floor(player.y / tileSize);
-        
+
         if (row >= 0 && row < tileRows && col >= 0 && col < tileCols) {
           const tile = tileMap[row][col];
           if (tile && tile.name === 'redX') {
@@ -994,11 +1037,15 @@
               brushingMinigame.dirtLevel = 1.0; // Start fully dirty
               brushingMinigame.redness = 0; // Start with no redness
               brushingMinigame.timeHoldingSpace = 0; // Reset time counter
+              brushingMinigame.timeSinceRed = 0; // Reset red timer
               brushingMinigame.redTriggerTime = 5.0 + Math.random() * 5.0; // Random time between 5-10 seconds
               brushingMinigame.tileRow = row;
               brushingMinigame.tileCol = col;
               brushingMinigame.brushX = canvas.width / 2;
               brushingMinigame.brushY = canvas.height / 2;
+              brushingMinigame.brushOffset = 0; // Start at center
+              brushingMinigame.brushDirection = 1; // Start moving right
+              brushingMinigame.particles = []; // Clear particles
               brushingMinigame.completed = false;
               brushingMinigame.broken = false;
             }
@@ -1012,45 +1059,45 @@
 
       function updateBalancingMinigame(dtMs) {
         if (!balancingMinigame.active) return;
-        
+
         const dt = dtMs / 1000; // Convert to seconds
-        
+
         // Player input affects angular velocity
         const leftInput = pressed('ArrowLeft') || pressed('KeyA');
         const rightInput = pressed('ArrowRight') || pressed('KeyD');
-        
+
         if (leftInput && !rightInput) {
           balancingMinigame.potAngularVelocity -= 0.2 * dt; // Lean left
         } else if (rightInput && !leftInput) {
           balancingMinigame.potAngularVelocity += 0.2 * dt; // Lean right
         }
-        
+
         // Natural physics: pot wants to fall (very strong teetering force)
         const gravity = 0.6; // How fast it wants to fall (very strong - requires constant input)
         const damping = 0.985; // Less friction to allow stronger movement
-        
+
         // Apply gravity based on current angle (very strong)
         balancingMinigame.potAngularVelocity += Math.sin(balancingMinigame.potAngle) * gravity * dt;
-        
+
         // Add constant teetering force to make it much harder
         balancingMinigame.potAngularVelocity += Math.sin(balancingMinigame.potAngle * 2) * 0.18 * dt;
-        
+
         // Add additional random-like teetering force
         balancingMinigame.potAngularVelocity += Math.sin(balancingMinigame.potAngle * 3 + Date.now() * 0.001) * 0.12 * dt;
-        
+
         // Apply damping
         balancingMinigame.potAngularVelocity *= Math.pow(damping, dt * 60); // Normalize to 60fps
-        
+
         // Update angle
         balancingMinigame.potAngle += balancingMinigame.potAngularVelocity * dt;
-        
+
         // Check if pot fell off (angle too extreme - make it easier to lose)
         const maxAngle = Math.PI / 4.5; // About 40 degrees (easier to lose)
         if (Math.abs(balancingMinigame.potAngle) > maxAngle && !balancingMinigame.breaking) {
           // Start breaking animation
           balancingMinigame.breaking = true;
           balancingMinigame.breakTimer = 0.5; // 0.5 seconds of breaking animation
-          
+
           // Create pot pieces flying off
           const potSize = 100;
           const stickX = balancingMinigame.stickX;
@@ -1058,7 +1105,7 @@
           const potContactY = stickTipY;
           const potCenterX = stickX;
           const potCenterY = potContactY - potSize / 2;
-          
+
           // Create 8-12 pieces
           const numPieces = 10;
           balancingMinigame.pieces = [];
@@ -1077,11 +1124,11 @@
             });
           }
         }
-        
+
         // Update breaking animation
         if (balancingMinigame.breaking) {
           balancingMinigame.breakTimer -= dt;
-          
+
           // Update pieces
           for (let i = 0; i < balancingMinigame.pieces.length; i++) {
             const piece = balancingMinigame.pieces[i];
@@ -1091,7 +1138,7 @@
             piece.rotation += piece.rotationSpeed * dt * 60;
             piece.opacity -= dt * 2; // Fade out
           }
-          
+
           // End minigame after breaking animation
           if (balancingMinigame.breakTimer <= 0) {
             // Failed - give base reward with shovel multiplier
@@ -1114,10 +1161,10 @@
             return;
           }
         }
-        
+
         // Update timer
         balancingMinigame.timeRemaining -= dt;
-        
+
         // Check if succeeded (15 seconds passed)
         if (balancingMinigame.timeRemaining <= 0) {
           // Success - give 3x reward with shovel multiplier
@@ -1140,62 +1187,122 @@
 
       function updateBrushingMinigame(dtMs) {
         if (!brushingMinigame.active) return;
-        
+
         const dt = dtMs / 1000; // Convert to seconds
         const spacePressed = pressed('Space');
-        
+
+        // Animate brush back and forth when spacebar is held
         if (spacePressed) {
           // Track time holding space
           brushingMinigame.timeHoldingSpace += dt;
-          
+
+          // Animate brush moving back and forth across the dirt
+          const brushSpeed = 100; // pixels per second
+          brushingMinigame.brushOffset += brushSpeed * dt * brushingMinigame.brushDirection;
+
+          // Reverse direction when reaching edges (60 pixels from center)
+          const maxOffset = 60;
+          if (brushingMinigame.brushOffset >= maxOffset) {
+            brushingMinigame.brushOffset = maxOffset;
+            brushingMinigame.brushDirection = -1; // Move left
+          } else if (brushingMinigame.brushOffset <= -maxOffset) {
+            brushingMinigame.brushOffset = -maxOffset;
+            brushingMinigame.brushDirection = 1; // Move right
+          }
+
+          // Spawn dirt particles while brushing (only if there's still dirt)
+          if (brushingMinigame.dirtLevel > 0 && Math.random() < 0.3) {
+            const centerX = canvas.width / 2;
+            const centerY = canvas.height / 2;
+            brushingMinigame.particles.push({
+              x: centerX + brushingMinigame.brushOffset + (Math.random() - 0.5) * 30,
+              y: centerY + (Math.random() - 0.5) * 30,
+              vx: (Math.random() - 0.5) * 100 + brushingMinigame.brushDirection * 30,
+              vy: (Math.random() - 0.5) * 100 - 30, // Fly upward
+              life: 1.0, // 0 = dead, 1.0 = fresh
+              size: Math.random() * 3 + 2
+            });
+          }
+
           // Brushing reduces dirt level (makes it cleaner)
           brushingMinigame.dirtLevel -= 0.2 * dt;
           brushingMinigame.dirtLevel = Math.max(0, brushingMinigame.dirtLevel);
-          
+
           // After at least 5 seconds, dirt is cleaned
           if (brushingMinigame.timeHoldingSpace >= 5.0) {
             // Dirt is now clean
             brushingMinigame.dirtLevel = 0;
-            
-            // After the random trigger time (5-10 seconds), dirt turns red instantly
-            if (brushingMinigame.timeHoldingSpace >= brushingMinigame.redTriggerTime && brushingMinigame.redness === 0) {
-              brushingMinigame.redness = 1.0; // Instantly turn red
+
+            // After the random trigger time (5-10 seconds), start red gradient transition
+            if (brushingMinigame.timeHoldingSpace >= brushingMinigame.redTriggerTime && brushingMinigame.redness < 1.0) {
+              // Gradually increase redness over 1 second
+              brushingMinigame.redness += dt / brushingMinigame.redTransitionTime;
+              brushingMinigame.redness = Math.min(1.0, brushingMinigame.redness);
             }
-            
-            // If dirt is red and still holding space, you lose
-            if (brushingMinigame.redness >= 1.0 && !brushingMinigame.broken) {
-              brushingMinigame.broken = true;
+
+            // Track time since turning red (only after fully red)
+            if (brushingMinigame.redness >= 1.0) {
+              brushingMinigame.timeSinceRed += dt;
+
+              // If holding space too long after fully red, you break it (lose)
+              if (brushingMinigame.timeSinceRed > brushingMinigame.perfectReleaseWindow && !brushingMinigame.broken) {
+                brushingMinigame.broken = true;
+              }
             }
           }
         } else {
           // When not brushing, reset time counter
           brushingMinigame.timeHoldingSpace = 0;
-          
-          // If dirt is clean and redness is present, release means success
+
+          // Reset brush position to center when not holding space
+          brushingMinigame.brushOffset = 0;
+          brushingMinigame.brushDirection = 1;
+
+          // If dirt is clean and red, releasing in the perfect window = success!
           if (brushingMinigame.dirtLevel <= 0 && brushingMinigame.redness > 0 && !brushingMinigame.completed && !brushingMinigame.broken) {
-            brushingMinigame.completed = true;
+            // Check if released within the perfect timing window
+            if (brushingMinigame.timeSinceRed <= brushingMinigame.perfectReleaseWindow) {
+              brushingMinigame.completed = true; // PERFECT! Maximum reward
+            } else {
+              brushingMinigame.broken = true; // Missed the window, failed
+            }
           }
-          
+
           // Reset redness when not brushing (dirt returns to normal)
           brushingMinigame.redness = 0;
-          
+          brushingMinigame.timeSinceRed = 0;
+
           // Dirt slowly returns if not fully cleaned
           if (brushingMinigame.dirtLevel < 1.0 && !brushingMinigame.completed && !brushingMinigame.broken) {
             brushingMinigame.dirtLevel += 0.15 * dt;
             brushingMinigame.dirtLevel = Math.min(1.0, brushingMinigame.dirtLevel);
           }
         }
-        
+
+        // Update particles
+        for (let i = brushingMinigame.particles.length - 1; i >= 0; i--) {
+          const p = brushingMinigame.particles[i];
+          p.x += p.vx * dt;
+          p.y += p.vy * dt;
+          p.vy += 100 * dt; // Gravity
+          p.life -= dt * 2; // Fade out over 0.5 seconds
+
+          // Remove dead particles
+          if (p.life <= 0) {
+            brushingMinigame.particles.splice(i, 1);
+          }
+        }
+
         // End minigame if completed or broken
         if (brushingMinigame.completed || brushingMinigame.broken) {
-          // Give reward
-          let multiplier = brushingMinigame.completed ? 3.0 : 1.0; // 3x for success, 1x for failure
+          // Give reward based on performance
+          let multiplier = brushingMinigame.completed ? 3.0 : 1.0; // 3x for perfect timing, 1x for failure
           if (inventory.equipment) {
             if (inventory.equipment.tier === 1) multiplier *= 1.5; // Simple shovel
             else if (inventory.equipment.tier === 2) multiplier *= 2.0; // Iron shovel
           }
           money.amount += Math.round(brushingMinigame.baseReward * multiplier);
-          
+
           // Convert tile to grass
           const grassDef = tileDefinitions.find(def => def.name === 'grass');
           if (grassDef && brushingMinigame.tileRow !== null && brushingMinigame.tileCol !== null) {
@@ -1204,7 +1311,7 @@
               canvas: createTileCanvas(grassDef.draw)
             };
           }
-          
+
           brushingMinigame.active = false;
         }
       }
@@ -1237,7 +1344,7 @@
         shovelSprites[tier] = sprite;
         return sprite;
       }
-      
+
       // Load shovel sprites for each tier
       loadShovelSprite(1, 'assets/sprites/shovel.png'); // Simple shovel
       loadShovelSprite(2, 'assets/sprites/iron-shovel.png'); // Iron Shovel
@@ -1262,7 +1369,7 @@
         for (let i = 0; i < flora.trees.length; i++) {
           const tree = flora.trees[i];
           const halfSize = tree.size / 2;
-          
+
           // Skip trees outside viewport (optimized bounds check)
           if (tree.x + halfSize < viewLeft - padding ||
               tree.x - halfSize > viewRight + padding ||
@@ -1293,18 +1400,18 @@
 
       function drawShopkeeper() {
         ctx.save();
-        
+
         // Draw shopkeeper sprite
         if (shopkeeperSprite.complete && shopkeeperSprite.naturalWidth > 0) {
           const spriteWidth = 43; // Match player size
           const spriteHeight = 43;
-          
+
           // Shopkeeper shadow
           ctx.fillStyle = 'rgba(0,0,0,0.25)';
           ctx.beginPath();
           ctx.ellipse(shopkeeper.x, shopkeeper.y + spriteHeight * 0.35, spriteWidth * 0.5, spriteHeight * 0.22, 0, 0, Math.PI * 2);
           ctx.fill();
-          
+
           const px = Math.round(shopkeeper.x - spriteWidth / 2);
           const py = Math.round(shopkeeper.y - spriteHeight / 2);
           ctx.imageSmoothingEnabled = false;
@@ -1315,7 +1422,7 @@
           ctx.beginPath();
           ctx.ellipse(shopkeeper.x, shopkeeper.y + shopkeeper.radius * 0.4, shopkeeper.radius * 0.6, shopkeeper.radius * 0.2, 0, 0, Math.PI * 2);
           ctx.fill();
-          
+
           ctx.fillStyle = '#ffd700'; // Yellow/gold color
           ctx.strokeStyle = '#ffaa00';
           ctx.lineWidth = 2;
@@ -1324,31 +1431,31 @@
           ctx.fill();
           ctx.stroke();
         }
-        
+
         ctx.restore();
       }
 
       function drawOldGuy() {
         ctx.save();
-        
+
         // Draw old guy sprite
         if (oldGuySprite.complete && oldGuySprite.naturalWidth > 0) {
           // Scale to match player size (43x43, 10% bigger than original 39x39)
           const spriteWidth = 43;
           const spriteHeight = 43;
-          
+
           // Old guy shadow
           ctx.fillStyle = 'rgba(0,0,0,0.25)';
           ctx.beginPath();
           ctx.ellipse(oldGuy.x, oldGuy.y + spriteHeight * 0.35, spriteWidth * 0.5, spriteHeight * 0.22, 0, 0, Math.PI * 2);
           ctx.fill();
-          
+
           const px = Math.round(oldGuy.x - spriteWidth / 2);
           const py = Math.round(oldGuy.y - spriteHeight / 2);
           ctx.imageSmoothingEnabled = false;
           ctx.drawImage(oldGuySprite, px, py, spriteWidth, spriteHeight);
         }
-        
+
         ctx.restore();
       }
 
@@ -1362,10 +1469,10 @@
         drawTiles();
         drawGrid();
         drawFlora();
-        
+
         // Shopkeeper NPC
         drawShopkeeper();
-        
+
         // Old Guy NPC
         drawOldGuy();
 
@@ -1379,7 +1486,7 @@
         const isMoving = Math.hypot(player.vx, player.vy) > 0.1;
         const isMovingUp = player.vy < -0.1; // Small threshold to prevent flickering
         let currentSprite;
-        
+
         if (isMovingUp) {
           // Alternate between back walk sprites when moving up
           if (isMoving) {
@@ -1397,7 +1504,7 @@
           // Use idle sprite when not moving
           currentSprite = playerSpriteIdle;
         }
-        
+
         if (currentSprite.complete && currentSprite.naturalWidth > 0) {
           const px = Math.round(player.x - player.width / 2);
           const py = Math.round(player.y - player.height / 2);
@@ -1422,17 +1529,17 @@
           const speed = Math.sqrt(speedSq);
           const nx = dirX / speed;
           const ny = dirY / speed;
-          
+
           // Position arrow outside player bounds (player radius + offset)
           const playerRadius = Math.max(player.width, player.height) / 2;
           const arrowDistance = playerRadius + 12; // Distance from player center
           const arrowX = player.x + nx * arrowDistance;
           const arrowY = player.y + ny * arrowDistance;
-          
+
           // Draw small black triangle arrow
           const arrowSize = 6; // Size of the arrow
           const angle = Math.atan2(ny, nx);
-          
+
           ctx.save();
           ctx.fillStyle = '#000000'; // Black arrow
           ctx.translate(arrowX, arrowY);
@@ -1462,7 +1569,7 @@
           h: 16
         };
         // Background
-        ctx.strokeStyle = 'rgba(139,111,71,0.35)'; // Brown UI borders
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.35)'; // White UI borders
         ctx.fillStyle = 'rgba(10,20,14,0.8)';
         ctx.lineWidth = 1;
         ctx.beginPath();
@@ -1487,27 +1594,27 @@
         const moneyTextWidth = ctx.measureText(moneyText).width;
         const moneyX = canvas.width - 16.5;
         const moneyY = 14.5;
-        
+
         // Money border sprite (centered on money text)
         if (moneyBorderSprite.complete && moneyBorderSprite.naturalWidth > 0) {
           // Calculate size to fully enclose the text with generous padding
           const borderPadding = 50; // Increased padding for better centering
           const borderWidth = moneyTextWidth + borderPadding;
           const borderHeight = 40; // Increased height to better center around text
-          
+
           // Center the border on the money text
           // moneyX is the right edge of the text, so center is at moneyX - moneyTextWidth/2
           const textCenterX = moneyX - moneyTextWidth / 2;
           const borderX = textCenterX - borderWidth / 2 - 4; // Moved left by 4 pixels
           const textCenterY = moneyY + 8; // Approximate center of text vertically
           const borderY = textCenterY - borderHeight / 2 + 6; // Moved down by 6 pixels (was 4)
-          
+
           ctx.imageSmoothingEnabled = false;
           ctx.drawImage(moneyBorderSprite, borderX, borderY, borderWidth, borderHeight);
         } else {
           // Fallback while loading
           ctx.fillStyle = 'rgba(10,20,14,0.8)';
-          ctx.strokeStyle = 'rgba(139,111,71,0.35)';
+          ctx.strokeStyle = 'rgba(255, 255, 255, 0.35)';
           ctx.lineWidth = 1;
           const moneyPadding = 8;
           const moneyHeight = 18;
@@ -1516,7 +1623,7 @@
           ctx.fill();
           ctx.stroke();
         }
-        
+
         // Money text (drawn on top of border, centered vertically)
         ctx.fillStyle = '#ffffff';
         ctx.fillText(moneyText, moneyX, moneyY + 8);
@@ -1524,30 +1631,30 @@
         // Draw balancing minigame
         if (balancingMinigame.active) {
           ctx.save();
-          
+
           // Background overlay
           ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
           ctx.fillRect(0, 0, canvas.width, canvas.height);
-          
+
           // Minigame panel (bigger to fit text)
           const panelWidth = 450;
           const panelHeight = 350;
           const panelX = (canvas.width - panelWidth) / 2;
           const panelY = (canvas.height - panelHeight) / 2;
-          
+
           ctx.fillStyle = 'rgba(8, 16, 12, 0.95)';
           ctx.fillRect(panelX, panelY, panelWidth, panelHeight);
-          
-          ctx.strokeStyle = '#8b6f47'; // Brown menu borders
+
+          ctx.strokeStyle = '#ffffff'; // White menu borders
           ctx.lineWidth = 3;
           ctx.strokeRect(panelX, panelY, panelWidth, panelHeight);
-          
+
           // Draw vertical stick with tip at top (shorter stick)
           const stickX = balancingMinigame.stickX;
           const stickBaseY = balancingMinigame.stickY + 25; // Bottom of stick (even shorter)
           const stickTipY = balancingMinigame.stickY - 25; // Top of stick (tip) (even shorter)
           const stickWidth = 6;
-          
+
           // Draw stick body (vertical line)
           ctx.strokeStyle = '#8b4513'; // Brown
           ctx.lineWidth = stickWidth;
@@ -1556,24 +1663,24 @@
           ctx.moveTo(stickX, stickBaseY);
           ctx.lineTo(stickX, stickTipY);
           ctx.stroke();
-          
+
           // Draw stick tip (small point at top)
           ctx.fillStyle = '#654321'; // Darker brown for tip
           ctx.beginPath();
           ctx.arc(stickX, stickTipY, 3, 0, Math.PI * 2);
           ctx.fill();
-          
+
           // Draw pot balancing on tip of stick (larger pot) - only if not breaking
           const potSize = 100; // Increased from 80 to 100 for better visibility
           const potContactY = stickTipY; // Pot contacts stick at tip
-          
+
           if (!balancingMinigame.breaking) {
             ctx.save();
             // Translate to the contact point (where pot touches stick tip)
             ctx.translate(stickX, potContactY);
             // Rotate around the contact point
             ctx.rotate(balancingMinigame.potAngle);
-            
+
             // Draw pot sprite from PNG, offset upward so bottom is at rotation point
             if (potSprite.complete && potSprite.naturalWidth > 0) {
               ctx.imageSmoothingEnabled = false;
@@ -1586,10 +1693,10 @@
               ctx.ellipse(0, -potSize / 2, potSize / 2, potSize / 2.5, 0, 0, Math.PI * 2);
               ctx.fill();
             }
-            
+
             ctx.restore();
           }
-          
+
           // Draw breaking pot pieces
           if (balancingMinigame.breaking && balancingMinigame.pieces.length > 0) {
             for (let i = 0; i < balancingMinigame.pieces.length; i++) {
@@ -1599,7 +1706,7 @@
                 ctx.globalAlpha = piece.opacity;
                 ctx.translate(piece.x, piece.y);
                 ctx.rotate(piece.rotation);
-                
+
                 // Draw pot piece (brown fragment)
                 ctx.fillStyle = '#8b4513';
                 ctx.strokeStyle = '#654321';
@@ -1608,12 +1715,12 @@
                 ctx.rect(-piece.size / 2, -piece.size / 2, piece.size, piece.size);
                 ctx.fill();
                 ctx.stroke();
-                
+
                 ctx.restore();
               }
             }
           }
-          
+
           // Timer text
           ctx.fillStyle = '#ffffff';
           ctx.font = 'bold 72px ui-monospace, Menlo, Consolas, monospace'; // 3x bigger (24 * 3)
@@ -1621,77 +1728,90 @@
           ctx.textBaseline = 'top';
           const timeText = Math.ceil(balancingMinigame.timeRemaining).toString();
           ctx.fillText(`Time: ${timeText}s`, canvas.width / 2, panelY + 20);
-          
+
           // Instructions
           ctx.fillStyle = '#ffffff';
           ctx.font = '18px ui-monospace, Menlo, Consolas, monospace';
           ctx.textBaseline = 'bottom';
           ctx.fillText('Use arrow keys to keep the pot from tipping!', canvas.width / 2, panelY + panelHeight - 20);
-          
+
           ctx.restore();
         }
 
         // Draw brushing minigame
         if (brushingMinigame.active) {
           ctx.save();
-          
+
           // Background overlay
           ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
           ctx.fillRect(0, 0, canvas.width, canvas.height);
-          
+
           // Minigame panel
           const panelWidth = 450;
           const panelHeight = 350;
           const panelX = (canvas.width - panelWidth) / 2;
           const panelY = (canvas.height - panelHeight) / 2;
-          
+
           ctx.fillStyle = 'rgba(8, 16, 12, 0.95)';
           ctx.fillRect(panelX, panelY, panelWidth, panelHeight);
-          
-          ctx.strokeStyle = '#8b6f47'; // Brown menu borders
+
+          ctx.strokeStyle = '#ffffff'; // White menu borders
           ctx.lineWidth = 3;
           ctx.strokeRect(panelX, panelY, panelWidth, panelHeight);
-          
+
           // Draw dirt sprite (in center, with red tint based on redness)
           const dirtSize = 150;
           const dirtX = canvas.width / 2;
           const dirtY = canvas.height / 2;
-          
+
           if (dirtSprite.complete && dirtSprite.naturalWidth > 0) {
             ctx.save();
             ctx.imageSmoothingEnabled = false;
-            
-            // Draw dirt sprite - stays fully visible and same color until it turns red
-            ctx.globalAlpha = 1.0; // Always full opacity, don't fade
+
+            // Draw dirt sprite normally first
+            ctx.globalAlpha = 1.0;
             ctx.drawImage(dirtSprite, dirtX - dirtSize / 2, dirtY - dirtSize / 2, dirtSize, dirtSize);
-            
-            // Add red overlay only when redness is at maximum (dirt turns red instantly)
+
+            // Apply red color tint using multiply blend mode (gradual transition)
             const redness = brushingMinigame.redness;
-            if (redness >= 1.0) {
-              ctx.globalAlpha = 0.7; // Red tint intensity
+            if (redness > 0) {
+              // Set blend mode to multiply for color tinting effect
+              ctx.globalCompositeOperation = 'multiply';
+              ctx.globalAlpha = redness; // Fade in the red over 1 second
               ctx.fillStyle = '#ff0000';
               ctx.fillRect(dirtX - dirtSize / 2, dirtY - dirtSize / 2, dirtSize, dirtSize);
+
+              // Reset blend mode
+              ctx.globalCompositeOperation = 'source-over';
+
+              // Add a subtle glow when fully red
+              if (redness >= 1.0) {
+                const pulse = Math.sin(Date.now() / 150) * 0.2 + 0.8;
+                ctx.globalAlpha = pulse * 0.15;
+                ctx.fillStyle = '#ff3333';
+                ctx.fillRect(dirtX - dirtSize / 2 - 5, dirtY - dirtSize / 2 - 5, dirtSize + 10, dirtSize + 10);
+              }
             }
-            
+
             ctx.restore();
           } else {
-            // Fallback while loading - stays same color until red
+            // Fallback while loading
             const redness = brushingMinigame.redness;
-            if (redness >= 1.0) {
-              ctx.fillStyle = '#ff0000'; // Red when broken
-            } else {
-              ctx.fillStyle = '#8b4513'; // Brown (stays same color)
-            }
+            // Blend from brown to red based on redness value
+            const r = Math.round(139 + (255 - 139) * redness);
+            const g = Math.round(69 * (1 - redness));
+            const b = Math.round(19 * (1 - redness));
+            ctx.fillStyle = `rgb(${r}, ${g}, ${b})`;
             ctx.beginPath();
             ctx.rect(dirtX - dirtSize / 2, dirtY - dirtSize / 2, dirtSize, dirtSize);
             ctx.fill();
           }
-          
-          // Draw brush sprite (follows mouse or centered)
+
+          // Draw brush sprite - now animated with brushOffset
           const brushSize = 80;
-          const brushX = brushingMinigame.brushX;
+          const brushX = canvas.width / 2 + brushingMinigame.brushOffset; // Add offset for animation
           const brushY = brushingMinigame.brushY;
-          
+
           if (brushSprite.complete && brushSprite.naturalWidth > 0) {
             ctx.save();
             ctx.imageSmoothingEnabled = false;
@@ -1704,18 +1824,29 @@
             ctx.rect(brushX - brushSize / 2, brushY - brushSize / 2, brushSize, brushSize);
             ctx.fill();
           }
-          
+
+          // Draw particles
+          for (const p of brushingMinigame.particles) {
+            ctx.save();
+            ctx.globalAlpha = p.life; // Fade out as life decreases
+            ctx.fillStyle = '#8b4513'; // Brown dirt color
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+          }
+
           // Instructions
           ctx.fillStyle = '#ffffff';
           ctx.font = '14px ui-monospace, Menlo, Consolas, monospace';
           ctx.textAlign = 'center';
           ctx.textBaseline = 'top';
           ctx.fillText('Hold SPACE to brush the dirt clean!', canvas.width / 2, panelY + 20);
-          
+
           ctx.font = '12px ui-monospace, Menlo, Consolas, monospace';
           ctx.textBaseline = 'bottom';
-          ctx.fillText('After 5 seconds, release SPACE before it turns red!', canvas.width / 2, panelY + panelHeight - 20);
-          
+          ctx.fillText('When it turns RED, release SPACE quickly for max cash!', canvas.width / 2, panelY + panelHeight - 20);
+
           ctx.restore();
         }
 
@@ -1737,7 +1868,7 @@
 
       function drawShopMenu() {
         ctx.save();
-        
+
         const shopWidth = 400;
         const itemHeight = 50;
         const itemPadding = 10;
@@ -1748,29 +1879,29 @@
         const shopHeight = titleHeight + topPadding + (shop.items.length * itemHeight) + ((shop.items.length - 1) * itemPadding) + bottomPadding + instructionsHeight;
         const shopX = Math.round(canvas.width / 2 - shopWidth / 2) + 0.5;
         const shopY = Math.round(canvas.height / 2 - shopHeight / 2) + 0.5;
-        
+
         // Background overlay
         ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
-        
+
         // Shop panel background
         ctx.fillStyle = 'rgba(8, 16, 12, 0.95)';
         ctx.beginPath();
         ctx.rect(shopX, shopY, shopWidth, shopHeight);
         ctx.fill();
-        
+
         // Shop panel border
-        ctx.strokeStyle = '#8b6f47'; // Brown borders
+        ctx.strokeStyle = '#ffffff'; // White borders
         ctx.lineWidth = 3;
         ctx.strokeRect(shopX, shopY, shopWidth, shopHeight);
-        
+
         // Title
         ctx.fillStyle = '#ffffff';
         ctx.font = 'bold 20px ui-monospace, Menlo, Consolas, monospace';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'top';
         ctx.fillText('Shop', shopX + shopWidth / 2, shopY + 12);
-        
+
         // Draw shop items
         const startY = shopY + titleHeight + topPadding;
         for (let i = 0; i < shop.items.length; i++) {
@@ -1780,31 +1911,31 @@
           const itemRectY = itemY;
           const itemRectW = shopWidth - 40;
           const itemRectH = itemHeight;
-          
+
           // Check if player already owns this tier
           const alreadyOwned = inventory.equipment && inventory.equipment.tier === item.tier;
-          
+
           // Item background
           ctx.fillStyle = alreadyOwned ? 'rgba(15, 30, 20, 0.6)' : 'rgba(20, 40, 30, 0.8)';
-          ctx.strokeStyle = '#6b4e37'; // Darker brown borders
+          ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)'; // White borders
           ctx.lineWidth = 2;
           ctx.beginPath();
           ctx.rect(itemRectX, itemRectY, itemRectW, itemRectH);
           ctx.fill();
           ctx.stroke();
-          
+
           // Item name
           ctx.fillStyle = '#ffffff';
           ctx.font = 'bold 14px ui-monospace, Menlo, Consolas, monospace';
           ctx.textAlign = 'left';
           ctx.textBaseline = 'top';
           ctx.fillText(item.name, itemRectX + 10, itemRectY + 6);
-          
+
           // Item tier
           ctx.fillStyle = '#ffffff';
           ctx.font = '11px ui-monospace, Menlo, Consolas, monospace';
           ctx.fillText(`Tier ${item.tier}`, itemRectX + 10, itemRectY + 22);
-          
+
           if (alreadyOwned) {
             // Show "Sold" for already owned items
             ctx.fillStyle = '#ffffff';
@@ -1820,7 +1951,7 @@
             ctx.font = 'bold 14px ui-monospace, Menlo, Consolas, monospace';
             ctx.textAlign = 'right';
             ctx.fillText(priceText, itemRectX + itemRectW - 10, itemRectY + 14);
-            
+
             // Buy button indicator
             if (canAfford) {
               ctx.fillStyle = '#ffffff';
@@ -1835,27 +1966,27 @@
             }
           }
         }
-        
+
         // Instructions
         ctx.fillStyle = '#ffffff';
         ctx.font = '11px ui-monospace, Menlo, Consolas, monospace';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'bottom';
-        ctx.fillText('Press Q to close | Press 1-5 to buy', shopX + shopWidth / 2, shopY + shopHeight - 10);
-        
+        ctx.fillText('Press Spacebar to close | Press 1-5 to buy', shopX + shopWidth / 2, shopY + shopHeight - 10);
+
         ctx.restore();
       }
 
       function purchaseItem(itemIndex) {
         if (itemIndex < 0 || itemIndex >= shop.items.length) return;
-        
+
         const item = shop.items[itemIndex];
-        
+
         // Check if player already owns a shovel of this tier
         if (inventory.equipment && inventory.equipment.tier === item.tier) {
           return; // Already own this type of shovel
         }
-        
+
         if (money.amount >= item.price) {
           money.amount -= item.price;
           // Get the appropriate sprite for this shovel tier
@@ -1876,48 +2007,48 @@
 
       function drawDialogueBox() {
         ctx.save();
-        
+
         const boxHeight = 100;
         const boxY = 0; // Top of screen instead of bottom
         const boxPadding = 20;
         const boxMargin = 20;
         const boxX = boxMargin;
         const boxWidth = canvas.width - boxMargin * 2;
-        
+
         // Background with slight transparency
         ctx.fillStyle = 'rgba(8, 16, 12, 0.95)';
         ctx.beginPath();
         ctx.rect(boxX, boxY, boxWidth, boxHeight);
         ctx.fill();
-        
+
         // Border
-        ctx.strokeStyle = '#8b6f47'; // Brown borders
+        ctx.strokeStyle = '#ffffff'; // White borders
         ctx.lineWidth = 3;
         ctx.strokeRect(boxX, boxY, boxWidth, boxHeight);
-        
+
         // Inner border for depth
-        ctx.strokeStyle = '#6b4e37'; // Darker brown
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)'; // Lighter white for inner border
         ctx.lineWidth = 1;
         ctx.strokeRect(boxX + 2, boxY + 2, boxWidth - 4, boxHeight - 4);
-        
+
         // Dialogue text
         ctx.fillStyle = '#ffffff';
         ctx.font = '16px ui-monospace, Menlo, Consolas, monospace';
         ctx.textAlign = 'left';
         ctx.textBaseline = 'top';
-        
+
         // Word wrap the dialogue text
         const maxWidth = boxWidth - boxPadding * 2;
         const dialogueText = tutorial.active ? tutorial.dialogue : (shopkeeper.dialogue || oldGuy.dialogue || '');
         const words = dialogueText.split(' ');
         let line = '';
         let y = boxY + boxPadding;
-        
+
         for (let i = 0; i < words.length; i++) {
           const testLine = line + words[i] + ' ';
           const metrics = ctx.measureText(testLine);
           const testWidth = metrics.width;
-          
+
           if (testWidth > maxWidth && i > 0) {
             ctx.fillText(line, boxX + boxPadding, y);
             line = words[i] + ' ';
@@ -1927,10 +2058,10 @@
           }
         }
         ctx.fillText(line, boxX + boxPadding, y);
-        
+
         // Draw help text in bottom right of textbox (only for tutorial)
         if (tutorial.active) {
-          const helpText = "Press Q to progress textboxes and talk to people like your uncle";
+          const helpText = "Press Spacebar to progress textboxes and talk to people";
           ctx.fillStyle = '#ffffff';
           ctx.font = '12px ui-monospace, Menlo, Consolas, monospace';
           ctx.textAlign = 'right';
@@ -1938,13 +2069,13 @@
           // Move further down and to the right (reduce padding more)
           ctx.fillText(helpText, boxX + boxWidth - 10, boxY + boxHeight - 10);
         }
-        
+
         ctx.restore();
       }
 
       function drawInventory() {
         ctx.save();
-        
+
         // Artifacts panel dimensions
         const slotSize = 48;
         const slotSpacing = 4;
@@ -1956,49 +2087,49 @@
         const equipmentLabelHeight = 16;
         const equipmentSpacing = 20;
         const instructionsHeight = 30;
-        
+
         // Calculate proper dimensions to fit all slots
         const slotsAreaWidth = slotsPerRow * slotSize + (slotsPerRow - 1) * slotSpacing;
         const slotsAreaHeight = numRows * slotSize + (numRows - 1) * slotSpacing;
         const inventoryWidth = slotsAreaWidth + panelPadding * 2;
         const inventoryHeight = titleHeight + equipmentSlotSize + equipmentLabelHeight + equipmentSpacing + slotsAreaHeight + panelPadding * 2 + instructionsHeight;
-        
+
         const panelX = Math.round(canvas.width / 2 - inventoryWidth / 2) + 0.5;
         const panelY = Math.round(canvas.height / 2 - inventoryHeight / 2) + 0.5;
-        
+
         // Background with semi-transparent overlay
         ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
-        
+
         // Main panel background
         ctx.fillStyle = 'rgba(8, 16, 12, 0.95)';
         ctx.beginPath();
         ctx.rect(panelX, panelY, inventoryWidth, inventoryHeight);
         ctx.fill();
-        
+
         // Panel border
-        ctx.strokeStyle = '#8b6f47'; // Brown borders
+        ctx.strokeStyle = '#ffffff'; // White borders
         ctx.lineWidth = 2;
         ctx.strokeRect(panelX, panelY, inventoryWidth, inventoryHeight);
-        
+
         // Title
         ctx.fillStyle = '#ffffff';
         ctx.font = 'bold 20px ui-monospace, Menlo, Consolas, monospace';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'top';
         ctx.fillText('Artifacts', panelX + inventoryWidth / 2, panelY + 12);
-        
+
         // Equipment slot (at the top, centered)
         const equipmentX = panelX + inventoryWidth / 2 - equipmentSlotSize / 2;
         const equipmentY = panelY + titleHeight;
         ctx.fillStyle = 'rgba(20, 40, 30, 0.8)';
-        ctx.strokeStyle = '#6b4e37'; // Darker brown
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.7)'; // White with slight transparency
         ctx.lineWidth = 2;
         ctx.beginPath();
         ctx.rect(equipmentX, equipmentY, equipmentSlotSize, equipmentSlotSize);
         ctx.fill();
         ctx.stroke();
-        
+
         // Draw equipment sprite if equipped
         if (inventory.equipment && inventory.equipment.sprite) {
           const sprite = inventory.equipment.sprite;
@@ -2013,47 +2144,47 @@
             ctx.restore();
           }
         }
-        
+
         // Equipment label (below the equipment slot)
         ctx.fillStyle = '#ffffff';
         ctx.font = '11px ui-monospace, Menlo, Consolas, monospace';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'top';
         ctx.fillText('Equipment', equipmentX + equipmentSlotSize / 2, equipmentY + equipmentSlotSize + 4);
-        
+
         // Artifact slots grid (below equipment label)
         const slotsStartX = panelX + panelPadding;
         const slotsStartY = equipmentY + equipmentSlotSize + equipmentLabelHeight + equipmentSpacing;
-        
+
         for (let row = 0; row < numRows; row++) {
           for (let col = 0; col < slotsPerRow; col++) {
             const slotIndex = row * slotsPerRow + col;
             const slotX = slotsStartX + col * (slotSize + slotSpacing);
             const slotY = slotsStartY + row * (slotSize + slotSpacing);
-            
+
             // Slot background
             ctx.fillStyle = 'rgba(20, 40, 30, 0.8)';
-            ctx.strokeStyle = '#6b4e37'; // Darker brown borders
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.7)'; // White borders
             ctx.lineWidth = 1.5;
             ctx.beginPath();
             ctx.rect(slotX, slotY, slotSize, slotSize);
             ctx.fill();
             ctx.stroke();
-            
+
             // Draw item if present (currently all slots are empty)
             if (inventory.slots[slotIndex]) {
               // Item rendering would go here when items are added
             }
           }
         }
-        
+
         // Instructions
         ctx.fillStyle = '#ffffff';
         ctx.font = '12px ui-monospace, Menlo, Consolas, monospace';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'bottom';
         ctx.fillText('Press E to close', panelX + inventoryWidth / 2, panelY + inventoryHeight - 12);
-        
+
         ctx.restore();
                     }
 
