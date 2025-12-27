@@ -140,6 +140,66 @@ This game was built as a standalone HTML file with no build process required. Al
 - ✅ NPCs with dialogue
 - ✅ Tutorial system
 
+## 🔧 Development Setup
+
+### Git Configuration
+
+This project uses **Git Bash** as the default terminal (configured in `.vscode/settings.json`).
+
+### GitHub CLI Setup (No Admin Required)
+
+If you don't have admin rights, you can install GitHub CLI locally:
+
+```bash
+# Create local bin directory
+mkdir -p ~/bin
+
+# Download and extract GitHub CLI
+cd ~/bin
+curl -L -o gh.zip https://github.com/cli/cli/releases/latest/download/gh_2.83.2_windows_amd64.zip
+unzip -q gh.zip && rm gh.zip
+
+# Add to PATH for current session
+export PATH="$HOME/bin/bin:$PATH"
+
+# Authenticate with GitHub
+gh auth login
+```
+
+**Note:** Add `export PATH="$HOME/bin/bin:$PATH"` to your `~/.bashrc` to make it permanent.
+
+### Git Credential Helper
+
+Configure Git to use GitHub CLI for authentication:
+
+```bash
+git config --global credential.helper ""
+git config --global credential.helper "!gh auth git-credential"
+```
+
+### Fork Syncing
+
+This project has two remotes:
+
+- `origin` - Main repository (nyrobovines-bit/the-game)
+- `fork` - Fork repository (runningsammy/the-game)
+
+**To push changes:**
+
+1. **Push to origin (direct push):**
+
+   ```bash
+   git push origin fork-main:main
+   ```
+
+2. **Sync to fork (if direct push fails):**
+   ```bash
+   export PATH="$HOME/bin/bin:$PATH"  # If using local gh installation
+   gh repo sync runningsammy/the-game --force
+   ```
+
+The fork is configured to sync from upstream, so use `gh repo sync` instead of direct `git push` to the fork remote.
+
 ## 📝 License
 
 This is a personal project.
