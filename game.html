@@ -333,7 +333,7 @@
         const oldGuySprite = new Image();
         oldGuySprite.imageSmoothingEnabled = false;
         oldGuySprite.src = 'assets/sprites/oldguy.png';
-        
+
         const shopkeeperSprite = new Image();
         shopkeeperSprite.imageSmoothingEnabled = false; // Pixelated rendering
         shopkeeperSprite.src = 'assets/sprites/shopkeeper.png';
@@ -2795,9 +2795,9 @@
 
             // Draw pot pole sprite (replaces drawn stick)
             // Ensure stick position is valid (fallback to center if undefined)
-            // Lower the stick position down in the panel
+            // Lower the stick position down in the panel so pole is visible below pot
             const stickX = balancingMinigame.stickX || canvas.width / 2;
-            const stickY = (balancingMinigame.stickY || canvas.height / 2) + 40; // Lower by 40px
+            const stickY = (balancingMinigame.stickY || canvas.height / 2) + 80; // Lower by 80px (was 40px) so pole extends below pot
             const stickBaseY = stickY + 25; // Bottom of stick
             const stickTipY = stickY - 25; // Top of stick (tip)
             const stickHeight = stickBaseY - stickTipY; // Height of stick area
@@ -2807,7 +2807,8 @@
               ctx.imageSmoothingEnabled = false;
               // Maintain aspect ratio but make it bigger
               // Use the sprite's natural aspect ratio to avoid warping
-              const aspectRatio = potPoleSprite.naturalWidth / potPoleSprite.naturalHeight;
+              const aspectRatio =
+                potPoleSprite.naturalWidth / potPoleSprite.naturalHeight;
               const baseHeight = stickHeight * 1.5; // 1.5x bigger (was 2x)
               const poleHeight = baseHeight;
               const poleWidth = poleHeight * aspectRatio; // Maintain aspect ratio
