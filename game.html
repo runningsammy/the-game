@@ -99,133 +99,16 @@
           followLerp: 0.12,
         };
 
-        // Title screen camera for scrolling background
-        const titleScreenCamera = {
-          centerX: world.width / 2, // Center of circular movement
-          centerY: world.height / 2,
-          radiusX: world.width * 0.2, // Horizontal radius of movement
-          radiusY: world.height * 0.15, // Vertical radius of movement
-          angle: 0, // Current angle in radians (for smooth circular movement)
-          speed: 0.3, // radians per second (slow, smooth rotation)
-        };
-
-        // Game state: 'title', 'playing', 'dayEnd', 'museum', or 'weekEnd'
-        let gameState = 'loading';
-
-        // Loading screen state
-        const loadingState = {
-          progress: 0,
-          allLoaded: false,
-          postLoadTimer: 0,
-          postLoadDelay: 1000, // 1 second after everything loads
-        };
-
-        // Track all sprites for loading progress
-        let allSprites = [];
-
-        // Function to check loading progress
-        function updateLoadingProgress() {
-          // If allSprites isn't populated yet, wait
-          if (allSprites.length === 0) {
-            loadingState.progress = 0;
-            return;
-          }
-
-          // Count loaded sprites (including failed loads - they're "done" too)
-          let loaded = 0;
-          let failed = 0;
-          for (let i = 0; i < allSprites.length; i++) {
-            const sprite = allSprites[i];
-            // Sprite is loaded if it's complete with valid dimensions
-            if (sprite.complete && sprite.naturalWidth > 0) {
-              loaded++;
-            } else if (sprite.complete && sprite.naturalWidth === 0) {
-              // Image failed to load (404, etc) - count as "done" so we don't wait forever
-              failed++;
-            }
-          }
-          // Progress is based on how many have finished loading (success or failure)
-          loadingState.progress = (loaded + failed) / allSprites.length;
-
-          // All sprites are "done" if they've all completed (either loaded or failed)
-          const allDone = allSprites.every((sprite) => sprite.complete);
-
-          if (allDone && !loadingState.allLoaded) {
-            loadingState.allLoaded = true;
-            loadingState.postLoadTimer = 0;
-          }
-        }
-
-        // Draw loading screen
-        function drawLoadingScreen() {
-          try {
-            // Clear canvas and draw background
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            ctx.fillStyle = '#0f1a12';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-            // Title
-            ctx.fillStyle = '#ffffff';
-            ctx.font = 'bold 32px ui-monospace, Menlo, Consolas, monospace';
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            ctx.fillText(
-              'Loading...',
-              canvas.width / 2,
-              canvas.height / 2 - 60
-            );
-
-            // Progress bar background
-            const barWidth = 400;
-            const barHeight = 30;
-            const barX = canvas.width / 2 - barWidth / 2;
-            const barY = canvas.height / 2;
-
-            ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
-            ctx.fillRect(barX, barY, barWidth, barHeight);
-
-            // Progress bar fill
-            const progressWidth =
-              barWidth * Math.min(Math.max(loadingState.progress, 0), 1);
-            ctx.fillStyle = '#51ff8a';
-            ctx.fillRect(barX, barY, progressWidth, barHeight);
-
-            // Progress bar border
-            ctx.strokeStyle = '#ffffff';
-            ctx.lineWidth = 2;
-            ctx.strokeRect(barX, barY, barWidth, barHeight);
-
-            // Progress text
-            ctx.fillStyle = '#ffffff';
-            ctx.font = '16px ui-monospace, Menlo, Consolas, monospace';
-            const percentText =
-              Math.round((loadingState.progress || 0) * 100) + '%';
-            ctx.fillText(percentText, canvas.width / 2, barY + barHeight + 30);
-          } catch (error) {
-            console.error('Loading screen draw error:', error);
-            // Fallback: just fill with dark background
-            ctx.fillStyle = '#0f1a12';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-          }
-        }
-
-        // Museum system
-        const museum = {
-          width: 16, // 16 tiles wide
-          height: 16, // 16 tiles tall
-          doorRow: 15, // Bottom row (0-indexed)
-          doorCol: 7, // Middle column (16/2 - 1 = 7, 0-indexed)
-          doorPrompt: false, // Whether door prompt is showing
-          wasNearDoor: false, // Track if player was near door (for one-time prompt activation)
-        };
+        // Game state: 'title', 'playing', 'dayEnd', or 'weekEnd'
+        let gameState = 'title';
 
         // Day/Time system
         const dayTime = {
           currentDay: 0, // 0 = Monday, 1 = Tuesday, ..., 6 = Sunday
-          currentHour: 8, // Start at 8:00 AM
+          currentHour: 8, // Start at 8 AM
           currentMinute: 0,
-          timeInSeconds: 0, // Start at beginning of day
-          secondsPerHour: 45, // Each in-game hour = 45 seconds
+          timeInSeconds: 0, // Total seconds elapsed this day (0 to 500 for 8 AM to 6 PM)
+          secondsPerHour: 50, // Each in-game hour = 50 seconds
           dayEndHour: 18, // 6 PM
           warningHour: 17, // 5 PM (1 hour before end)
           days: [
@@ -416,14 +299,6 @@
         brushSprite.imageSmoothingEnabled = false;
         brushSprite.src = 'assets/sprites/brush.png';
 
-        const speedBrushSprite = new Image();
-        speedBrushSprite.imageSmoothingEnabled = false;
-        speedBrushSprite.src = 'assets/sprites/Speed_Brush.png';
-
-        const candyKidSprite = new Image();
-        candyKidSprite.imageSmoothingEnabled = false;
-        candyKidSprite.src = 'assets/sprites/Candy_Kid.png';
-
         const dirtSprite = new Image();
         dirtSprite.imageSmoothingEnabled = false;
         dirtSprite.src = 'assets/sprites/dirt.png';
@@ -438,23 +313,7 @@
 
         const flowerSprite = new Image();
         flowerSprite.imageSmoothingEnabled = false;
-        flowerSprite.src = 'assets/sprites/New_Flower.png';
-
-        const rock1Sprite = new Image();
-        rock1Sprite.imageSmoothingEnabled = false;
-        rock1Sprite.src = 'assets/sprites/Rock_1.png';
-
-        const rock2Sprite = new Image();
-        rock2Sprite.imageSmoothingEnabled = false;
-        rock2Sprite.src = 'assets/sprites/Rock_2.png';
-
-        const newXSprite = new Image();
-        newXSprite.imageSmoothingEnabled = false;
-        newXSprite.src = 'assets/sprites/New_New_X.png';
-
-        const newBushSprite = new Image();
-        newBushSprite.imageSmoothingEnabled = false;
-        newBushSprite.src = 'assets/sprites/New_Bush.png';
+        flowerSprite.src = 'assets/sprites/Flowers.png';
 
         // Function to regenerate tiles that use sprites (optimized - only regenerates when needed)
         // Deferred to avoid blocking the main thread during load
@@ -474,7 +333,6 @@
               'rockCluster',
               'redX',
               'secretX',
-              'purpleX',
             ];
 
             for (let row = 0; row < tileRows; row++) {
@@ -485,18 +343,9 @@
                   const def = tileDefinitions.find((d) => d.name === tile.name);
                   if (def) {
                     // Regenerate the canvas with the now-loaded sprites
-                    // Preserve rotation for grass tiles
-                    const oldTile = tileMap[row][col];
-                    const rotation =
-                      oldTile && oldTile.grassRotation !== undefined
-                        ? oldTile.grassRotation
-                        : 0;
                     tileMap[row][col] = {
                       name: def.name,
-                      canvas: createTileCanvas((ctx) =>
-                        def.draw(ctx, rotation)
-                      ),
-                      grassRotation: rotation, // Preserve rotation
+                      canvas: createTileCanvas(def.draw),
                     };
                   }
                 }
@@ -516,24 +365,6 @@
           regenerateTiles();
         };
 
-        // Regenerate tiles when rock sprites load (deferred)
-        rock1Sprite.onload = function () {
-          regenerateTiles();
-        };
-
-        rock2Sprite.onload = function () {
-          regenerateTiles();
-        };
-
-        // Regenerate tiles when New_X sprite loads (deferred)
-        newXSprite.onload = function () {
-          regenerateTiles();
-        };
-
-        newBushSprite.onload = function () {
-          regenerateTiles();
-        };
-
         // If sprite is already loaded (cached), regenerate tiles immediately
         if (grassSprite.complete && grassSprite.naturalWidth > 0) {
           // Sprite already loaded, but tiles haven't been created yet
@@ -548,31 +379,6 @@
         const shopkeeperSprite = new Image();
         shopkeeperSprite.imageSmoothingEnabled = false; // Pixelated rendering
         shopkeeperSprite.src = 'assets/sprites/shopkeeper.png';
-
-        const curatorSprite = new Image();
-        curatorSprite.imageSmoothingEnabled = false;
-        curatorSprite.src = 'assets/sprites/Museum_Curator.png';
-
-        const vendingMachineSprite = new Image();
-        vendingMachineSprite.imageSmoothingEnabled = false;
-        vendingMachineSprite.src = 'assets/sprites/Vending_Machine.png';
-
-        const chocolateBarSprite = new Image();
-        chocolateBarSprite.imageSmoothingEnabled = false;
-        chocolateBarSprite.src = 'assets/sprites/Chocolate_Bar.png';
-
-        // Museum sprites
-        const floorTileSprite = new Image();
-        floorTileSprite.imageSmoothingEnabled = false;
-        floorTileSprite.src = 'assets/sprites/Floor_Tile.png';
-
-        const wallTileSprite = new Image();
-        wallTileSprite.imageSmoothingEnabled = false;
-        wallTileSprite.src = 'assets/sprites/Wall_Tile.png';
-
-        const wallDoorSprite = new Image();
-        wallDoorSprite.imageSmoothingEnabled = false;
-        wallDoorSprite.src = 'assets/sprites/Wall_Door.png';
 
         // Load player sprites from PNG images
         const playerSpriteIdle = new Image();
@@ -680,26 +486,11 @@
           {
             name: 'grass',
             weight: 110,
-            draw(ctx, rotation = 0) {
+            draw(ctx) {
               // Always use grass sprite (only draw if loaded)
               ctx.imageSmoothingEnabled = false;
               if (grassSprite.complete && grassSprite.naturalWidth > 0) {
-                // Apply random rotation (0, 90, 180, or 270 degrees)
-                if (rotation !== 0) {
-                  ctx.save();
-                  ctx.translate(tileSize / 2, tileSize / 2);
-                  ctx.rotate((rotation * Math.PI) / 180);
-                  ctx.drawImage(
-                    grassSprite,
-                    -tileSize / 2,
-                    -tileSize / 2,
-                    tileSize,
-                    tileSize
-                  );
-                  ctx.restore();
-                } else {
-                  ctx.drawImage(grassSprite, 0, 0, tileSize, tileSize);
-                }
+                ctx.drawImage(grassSprite, 0, 0, tileSize, tileSize);
               }
             },
           },
@@ -712,10 +503,40 @@
               if (grassSprite.complete && grassSprite.naturalWidth > 0) {
                 ctx.drawImage(grassSprite, 0, 0, tileSize, tileSize);
               }
-              // Draw Rock_1 sprite on top of grass
-              if (rock1Sprite.complete && rock1Sprite.naturalWidth > 0) {
-                ctx.drawImage(rock1Sprite, 0, 0, tileSize, tileSize);
-              }
+              const x = tileCell * 1;
+              const y = tileCell * 1;
+              const width = tileCell * 6;
+              const height = tileCell * 6;
+              ctx.fillStyle = colors.outline;
+              ctx.fillRect(x, y, width, height);
+              ctx.fillStyle = colors.rockDark;
+              ctx.fillRect(
+                x + tileCell,
+                y + tileCell,
+                width - tileCell * 2,
+                height - tileCell * 2
+              );
+              ctx.fillStyle = colors.rockMid;
+              ctx.fillRect(
+                x + tileCell * 2,
+                y + tileCell * 2,
+                width - tileCell * 4,
+                height - tileCell * 3
+              );
+              ctx.fillStyle = colors.rockLight;
+              ctx.fillRect(
+                x + tileCell * 2,
+                y + tileCell * 2,
+                width - tileCell * 5,
+                height - tileCell * 5
+              );
+              ctx.fillStyle = colors.rockShadow;
+              ctx.fillRect(
+                x + tileCell * 2,
+                y + tileCell * 4,
+                width - tileCell * 4,
+                tileCell * 2
+              );
             },
           },
           {
@@ -727,10 +548,35 @@
               if (grassSprite.complete && grassSprite.naturalWidth > 0) {
                 ctx.drawImage(grassSprite, 0, 0, tileSize, tileSize);
               }
-              // Draw Rock_2 sprite on top of grass
-              if (rock2Sprite.complete && rock2Sprite.naturalWidth > 0) {
-                ctx.drawImage(rock2Sprite, 0, 0, tileSize, tileSize);
-              }
+              const cluster = [
+                { x: 1, y: 2, w: 3, h: 3, light: colors.rockMid },
+                { x: 4, y: 1, w: 3, h: 3, light: colors.rockLight },
+                { x: 3, y: 4, w: 4, h: 3, light: colors.rockDark },
+                { x: 0, y: 4, w: 3, h: 3, light: colors.rockMid },
+              ];
+              cluster.forEach((rock) => {
+                ctx.fillStyle = colors.outline;
+                ctx.fillRect(
+                  rock.x * tileCell,
+                  rock.y * tileCell,
+                  rock.w * tileCell,
+                  rock.h * tileCell
+                );
+                ctx.fillStyle = rock.light;
+                ctx.fillRect(
+                  (rock.x + 0.5) * tileCell,
+                  (rock.y + 0.5) * tileCell,
+                  (rock.w - 1) * tileCell,
+                  (rock.h - 1) * tileCell
+                );
+                ctx.fillStyle = colors.rockShadow;
+                ctx.fillRect(
+                  (rock.x + 0.5) * tileCell,
+                  (rock.y + rock.h - 1) * tileCell,
+                  (rock.w - 1.2) * tileCell,
+                  tileCell
+                );
+              });
             },
           },
           {
@@ -742,9 +588,9 @@
               if (grassSprite.complete && grassSprite.naturalWidth > 0) {
                 ctx.drawImage(grassSprite, 0, 0, tileSize, tileSize);
               }
-              // Draw New_Bush sprite on top of grass
-              if (newBushSprite.complete && newBushSprite.naturalWidth > 0) {
-                ctx.drawImage(newBushSprite, 0, 0, tileSize, tileSize);
+              // Draw flower sprite on top of grass
+              if (flowerSprite.complete && flowerSprite.naturalWidth > 0) {
+                ctx.drawImage(flowerSprite, 0, 0, tileSize, tileSize);
               }
             },
           },
@@ -804,9 +650,28 @@
               if (grassSprite.complete && grassSprite.naturalWidth > 0) {
                 ctx.drawImage(grassSprite, 0, 0, tileSize, tileSize);
               }
-              // Draw New_New_X sprite on top of grass (no darkening needed)
-              if (newXSprite.complete && newXSprite.naturalWidth > 0) {
-                ctx.drawImage(newXSprite, 0, 0, tileSize, tileSize);
+              const maxIndex = cellsPerTile - 1;
+              for (let y = 0; y < cellsPerTile; y++) {
+                for (let x = 0; x < cellsPerTile; x++) {
+                  const diag1 = Math.abs(x - y);
+                  const diag2 = Math.abs(x + y - maxIndex);
+                  const onX = diag1 <= 1 || diag2 <= 1;
+                  if (!onX) continue;
+                  let color = colors.redBase;
+                  if (diag1 === 0 && diag2 === 0) {
+                    color = colors.redBright;
+                  } else if (
+                    diag1 === 1 ||
+                    diag2 === 1 ||
+                    x === 0 ||
+                    y === 0 ||
+                    x === maxIndex ||
+                    y === maxIndex
+                  ) {
+                    color = colors.redDark;
+                  }
+                  fillCell(ctx, x, y, color);
+                }
               }
             },
           },
@@ -821,20 +686,6 @@
                 ctx.drawImage(grassSprite, 0, 0, tileSize, tileSize);
               }
               // No X pattern drawn - completely invisible to player
-            },
-          },
-          {
-            name: 'purpleX',
-            weight: 1, // Half as common as secretX (which is 2)
-            draw(ctx) {
-              // Always use grass sprite (only draw if loaded)
-              // Purple X tiles are completely invisible - just show grass
-              // Only visible when radar discovers them
-              ctx.imageSmoothingEnabled = false;
-              if (grassSprite.complete && grassSprite.naturalWidth > 0) {
-                ctx.drawImage(grassSprite, 0, 0, tileSize, tileSize);
-              }
-              // No X pattern drawn - completely invisible to player until radar finds it
             },
           },
         ];
@@ -883,28 +734,17 @@
             for (let col = 0; col < tileCols; col++) {
               let def = pickTileDefinition();
 
-              // If redX, secretX, or purpleX tile was picked and there's a tree at this position, replace with grass
+              // If redX or secretX tile was picked and there's a tree at this position, replace with grass
               if (
-                (def.name === 'redX' ||
-                  def.name === 'secretX' ||
-                  def.name === 'purpleX') &&
+                (def.name === 'redX' || def.name === 'secretX') &&
                 isTreeAtTile(row, col)
               ) {
                 def = tileDefinitions.find((d) => d.name === 'grass');
               }
 
-              // Generate random rotation for grass tiles (0, 90, 180, or 270 degrees)
-              let grassRotation = 0;
-              if (def.name === 'grass') {
-                grassRotation = [0, 90, 180, 270][
-                  Math.floor(Math.random() * 4)
-                ];
-              }
-
               newTileMap[row][col] = {
                 name: def.name,
-                canvas: createTileCanvas((ctx) => def.draw(ctx, grassRotation)),
-                grassRotation: grassRotation, // Store rotation for reference
+                canvas: createTileCanvas(def.draw),
               };
             }
           }
@@ -994,42 +834,17 @@
           currentTab: 0, // 0 = Shovels, 1 = Equipment
           tabs: [
             {
-              name: 'Multipliers',
+              name: 'Shovels',
               items: [
+                { name: 'Simple shovel', tier: 1, price: 25, type: 'shovel' },
+                { name: 'Iron Shovel', tier: 2, price: 200, type: 'shovel' },
+                { name: 'Steel Shovel', tier: 3, price: 350, type: 'shovel' },
+                { name: 'Diamond Shovel', tier: 4, price: 500, type: 'shovel' },
                 {
-                  name: 'Simple trowel',
-                  tier: 1,
-                  price: 25,
-                  type: 'shovel',
-                  purchased: false,
-                },
-                {
-                  name: 'Electric brush',
-                  tier: 2,
-                  price: 200,
-                  type: 'shovel',
-                  purchased: false,
-                },
-                {
-                  name: 'Iron Sieve',
-                  tier: 3,
-                  price: 350,
-                  type: 'shovel',
-                  purchased: false,
-                },
-                {
-                  name: 'Extra Hand',
-                  tier: 4,
-                  price: 500,
-                  type: 'shovel',
-                  purchased: false,
-                },
-                {
-                  name: 'Master Precision',
+                  name: 'Legendary Shovel',
                   tier: 5,
                   price: 2000,
                   type: 'shovel',
-                  purchased: false,
                 },
               ],
             },
@@ -1037,13 +852,6 @@
               name: 'Equipment',
               items: [
                 { name: 'Radar', tier: 0, price: 0, type: 'equipment' }, // $0 for testing
-                { name: 'Speed Brush', tier: 0, price: 200, type: 'equipment' },
-                {
-                  name: 'Purple X Shovel',
-                  tier: 6,
-                  price: 100,
-                  type: 'shovel',
-                },
               ],
             },
           ],
@@ -1060,13 +868,11 @@
           dialogue: null, // Current dialogue text
           dialogueStage: 0, // 0 = none, 1 = "Hello", 2 = "What would you like?"
           dialogueTimer: 0,
-          hasTalkedOnce: false, // Track if player has talked to shopkeeper once with money
-          hasBoughtFirstItem: false, // Track if player has bought their first item
         };
 
         // Tutorial dialogue system
         const tutorial = {
-          active: false, // Tutorial disabled - oldGuy shows first dialogue instead
+          active: true, // Show tutorial dialogue when game starts
           dialogue: 'Hey! Over here!',
         };
 
@@ -1080,49 +886,11 @@
           hasCompletedIntro: false, // Track if player has completed initial dialogue sequence
         };
 
-        // Vending Machine (positioned to the left of spawn)
-        const vendingMachine = {
-          x: world.width / 2 - 150, // To the left of spawn
-          y: world.height - 40, // Same Y as spawn
-          radius: 35, // Made bigger (was 25)
-          open: false,
-          candyBarPrice: 50, // Starting price
-        };
-
-        // Candy Kid NPC (positioned next to vending machine)
-        const candyKid = {
-          x: world.width / 2 - 250, // To the left of vending machine
-          y: world.height - 40, // Same Y as spawn
-          radius: 20,
-          dialogue: null, // Current dialogue text
-          dialogueStage: 0, // 0 = none, 1 = first dialogue, 2 = "Candy..."
-          hasTalkedOnce: false, // Track if player has talked once
-        };
-
-        // Museum Curator NPC (positioned in museum)
-        const curator = {
-          x: 0, // Will be set in initializeMuseum
-          y: 0, // Will be set in initializeMuseum
-          radius: 20,
-          dialogue: null, // Current dialogue text
-          dialogueStage: 0, // 0 = none, 1 = has artifacts, 2 = no artifacts
-          dialogueTimer: 0, // Timer for auto-closing dialogue
-        };
-
         // Inventory system
         const inventory = {
           open: false,
           slots: Array(15).fill(null), // 15 inventory slots
           equipment: null, // 1 equipment slot
-        };
-
-        // Candybar boost system
-        const candybarBoost = {
-          active: false, // Whether candybar boost is currently active
-          duration: 0, // Time remaining in seconds
-          maxDuration: 20, // 20 seconds duration
-          cooldown: 0, // Time remaining on cooldown in seconds
-          cooldownTime: 20, // 20 seconds cooldown
         };
 
         const keys = Object.create(null);
@@ -1160,10 +928,6 @@
               ) {
                 return;
               }
-              // Close vending machine shop if open
-              if (vendingMachine.open) {
-                vendingMachine.open = false;
-              }
               // Close shop if open
               if (shop.open) {
                 shop.open = false;
@@ -1191,14 +955,8 @@
               ) {
                 return;
               }
-              // If vending machine shop is open, close it
-              if (vendingMachine.open) {
-                vendingMachine.open = false;
-                player.vx = 0;
-                player.vy = 0;
-              }
               // If shop is open, close it
-              else if (shop.open) {
+              if (shop.open) {
                 shop.open = false;
                 shopkeeper.dialogue = null;
                 shopkeeper.dialogueStage = 0;
@@ -1206,65 +964,21 @@
                 player.vy = 0;
               }
               // If dialogue is showing, close it
-              // Skip tutorial check in museum state (tutorial doesn't apply there)
-              else if (tutorial.active && gameState !== 'museum') {
+              else if (tutorial.active) {
                 tutorial.active = false; // Close tutorial
                 player.vx = 0;
                 player.vy = 0;
-              } else if (
-                shopkeeper.dialogue ||
-                oldGuy.dialogue ||
-                candyKid.dialogue ||
-                curator.dialogue
-              ) {
+              } else if (shopkeeper.dialogue || oldGuy.dialogue) {
                 if (shopkeeper.dialogue) {
                   advanceShopkeeperDialogue();
                 } else if (oldGuy.dialogue) {
                   advanceOldGuyDialogue(); // Advance through dialogue stages
                   player.vx = 0;
                   player.vy = 0;
-                } else if (candyKid.dialogue) {
-                  advanceCandyKidDialogue();
-                  player.vx = 0;
-                  player.vy = 0;
-                } else if (curator.dialogue) {
-                  advanceCuratorDialogue();
-                  player.vx = 0;
-                  player.vy = 0;
                 }
               } else {
-                // Try to interact (curator in museum, or other NPCs in playing state)
-                // Check curator directly in museum state, otherwise use handleInteraction
-                if (gameState === 'museum') {
-                  // Direct curator interaction check - use fixed distance for reliability
-                  const dx = player.x - curator.x;
-                  const dy = player.y - curator.y;
-                  const distSq = dx * dx + dy * dy;
-                  // Use fixed interaction distance of 50 pixels
-                  const interactionDistSq = 50 * 50;
-
-                  if (distSq <= interactionDistSq) {
-                    const hasArtifacts = inventory.slots.some(
-                      (slot) => slot !== null
-                    );
-
-                    if (hasArtifacts) {
-                      curator.dialogue =
-                        'Hello there! I see you have some artifacts.';
-                      curator.dialogueStage = 0; // Start at 0, advanceCuratorDialogue will increment to 1
-                    } else {
-                      curator.dialogue =
-                        "Looks like you don't have anything to put in your museum.";
-                      curator.dialogueStage = 0; // Start at 0, advanceCuratorDialogue will increment to 1
-                    }
-                    curator.dialogueTimer = 0;
-                    player.vx = 0;
-                    player.vy = 0;
-                  }
-                } else {
-                  // Use normal handleInteraction for playing state
-                  handleInteraction();
-                }
+                // Otherwise, try to interact
+                handleInteraction();
               }
             }
 
@@ -1284,10 +998,10 @@
               e.preventDefault();
               gameState = 'title';
               // Reset everything for new game
-              dayTime.currentDay = 0; // Start on Monday
-              dayTime.currentHour = 8; // Start at 8:00 AM
+              dayTime.currentDay = 0;
+              dayTime.currentHour = 8;
               dayTime.currentMinute = 0;
-              dayTime.timeInSeconds = 0; // Start at beginning of day
+              dayTime.timeInSeconds = 0;
               dayTime.totalMoney = 0;
               money.amount = 0;
               return;
@@ -1340,44 +1054,6 @@
           const scaleY = canvas.height / rect.height;
           const x = (e.clientX - rect.left) * scaleX;
           const y = (e.clientY - rect.top) * scaleY;
-
-          // Museum door prompt click handling
-          if (gameState === 'museum' && museum.doorPrompt) {
-            const panelWidth = 400;
-            const panelHeight = 200;
-            const panelX = (canvas.width - panelWidth) / 2;
-            const panelY = (canvas.height - panelHeight) / 2;
-            const buttonWidth = 120;
-            const buttonHeight = 50;
-            const buttonSpacing = 40;
-            const continueButtonX =
-              panelX + panelWidth / 2 - buttonWidth - buttonSpacing / 2;
-            const stayButtonX = panelX + panelWidth / 2 + buttonSpacing / 2;
-            const buttonY = panelY + panelHeight - buttonHeight - 30;
-
-            // Check if clicking continue button
-            if (
-              x >= continueButtonX &&
-              x <= continueButtonX + buttonWidth &&
-              y >= buttonY &&
-              y <= buttonY + buttonHeight
-            ) {
-              museum.doorPrompt = false;
-              startNewDay();
-              return;
-            }
-
-            // Check if clicking stay button
-            if (
-              x >= stayButtonX &&
-              x <= stayButtonX + buttonWidth &&
-              y >= buttonY &&
-              y <= buttonY + buttonHeight
-            ) {
-              museum.doorPrompt = false;
-              return;
-            }
-          }
 
           // Declaration minigame buttons
           if (declarationMinigame.active && !declarationMinigame.answered) {
@@ -1479,150 +1155,10 @@
               }
             }
           }
-
-          // Vending machine menu click handling
-          if (vendingMachine.open) {
-            const shopWidth = 400;
-            const itemHeight = 50;
-            const titleHeight = 40;
-            const topPadding = 15;
-            const shopHeight = titleHeight + topPadding + itemHeight + 15 + 25;
-            const shopX = Math.round(canvas.width / 2 - shopWidth / 2) + 0.5;
-            const shopY = Math.round(canvas.height / 2 - shopHeight / 2) + 0.5;
-
-            const itemY = shopY + titleHeight + topPadding;
-            const itemRectX = shopX + 20;
-            const itemRectY = itemY;
-            const itemRectW = shopWidth - 40;
-            const itemRectH = itemHeight;
-
-            // Check if clicking on candybar item
-            if (
-              x >= itemRectX &&
-              x <= itemRectX + itemRectW &&
-              y >= itemRectY &&
-              y <= itemRectY + itemRectH
-            ) {
-              purchaseVendingMachineItem();
-              return;
-            }
-          }
-
-          // Inventory click handling (eating candybars)
-          if (inventory.open) {
-            const slotSize = 48;
-            const slotSpacing = 4;
-            const slotsPerRow = 5;
-            const numRows = 3;
-            const panelPadding = 24;
-            const equipmentSlotSize = 64;
-            const titleHeight = 40;
-            const equipmentLabelHeight = 16;
-            const equipmentSpacing = 20;
-
-            const slotsAreaWidth =
-              slotsPerRow * slotSize + (slotsPerRow - 1) * slotSpacing;
-            const slotsAreaHeight =
-              numRows * slotSize + (numRows - 1) * slotSpacing;
-            const inventoryWidth = slotsAreaWidth + panelPadding * 2;
-            const inventoryHeight =
-              titleHeight +
-              equipmentSlotSize +
-              equipmentLabelHeight +
-              equipmentSpacing +
-              slotsAreaHeight +
-              panelPadding * 2 +
-              30;
-
-            const panelX =
-              Math.round(canvas.width / 2 - inventoryWidth / 2) + 0.5;
-            const panelY =
-              Math.round(canvas.height / 2 - inventoryHeight / 2) + 0.5;
-
-            const equipmentX =
-              panelX + inventoryWidth / 2 - equipmentSlotSize / 2;
-            const equipmentY = panelY + titleHeight;
-            const slotsStartX = panelX + panelPadding;
-            const slotsStartY =
-              equipmentY +
-              equipmentSlotSize +
-              equipmentLabelHeight +
-              equipmentSpacing;
-
-            // Check if clicking on inventory slots
-            for (let row = 0; row < numRows; row++) {
-              for (let col = 0; col < slotsPerRow; col++) {
-                const slotIndex = row * slotsPerRow + col;
-                const slotX = slotsStartX + col * (slotSize + slotSpacing);
-                const slotY = slotsStartY + row * (slotSize + slotSpacing);
-
-                if (
-                  x >= slotX &&
-                  x <= slotX + slotSize &&
-                  y >= slotY &&
-                  y <= slotY + slotSize
-                ) {
-                  const item = inventory.slots[slotIndex];
-                  if (
-                    item &&
-                    item.type === 'consumable' &&
-                    item.name === 'Candybar'
-                  ) {
-                    // Eat candybar if not on cooldown and boost not active
-                    if (candybarBoost.cooldown <= 0 && !candybarBoost.active) {
-                      candybarBoost.active = true;
-                      candybarBoost.duration = candybarBoost.maxDuration;
-                      inventory.slots[slotIndex] = null; // Remove from inventory
-                    }
-                  }
-                  return;
-                }
-              }
-            }
-          }
         });
 
         function clamp(value, min, max) {
           return Math.min(max, Math.max(min, value));
-        }
-
-        // Function to initialize museum
-        function initializeMuseum() {
-          // Set museum world size
-          const museumTileSize = tileSize; // Use same tile size
-          const museumWorldWidth = museum.width * museumTileSize;
-          const museumWorldHeight = museum.height * museumTileSize;
-
-          // Position player in center-top of museum
-          player.x = museumWorldWidth / 2;
-          player.y = museumTileSize * 2; // A bit down from top
-          player.vx = 0;
-          player.vy = 0;
-
-          // Position curator in bottom left of museum
-          curator.x = museumTileSize * 2; // Left side, 2 tiles from edge
-          curator.y = museumWorldHeight - museumTileSize * 2; // Bottom, 2 tiles from edge
-
-          // Position camera to place museum at bottom middle of screen
-          camera.x = museumWorldWidth / 2; // Center horizontally (160 for 320px wide museum)
-          // Position camera so museum appears at bottom of screen
-          // Translation formula: screenY = worldY + (canvas.height/2 - camera.y)
-          // Museum is drawn from world (0,0) to (320,320)
-          // We want museum bottom (worldY = 320) at screen bottom (screenY = 500)
-          // 500 = 320 + (250 - camera.y)
-          // camera.y = 320 + 250 - 500 = 70
-          // This positions museum from screenY 180 to 500 (at bottom)
-          camera.y = museumWorldHeight - canvas.height / 2; // = 70
-          camera.x = Math.round(camera.x);
-          camera.y = Math.round(camera.y);
-
-          // Debug: Force camera position (museum is 320px tall, canvas is 500px tall)
-          // With camera.y = 70: screenY = worldY + 180
-          // Museum top (worldY=0) → screenY=180, bottom (worldY=320) → screenY=500 ✓
-
-          // Reset door prompt and tracking
-          museum.doorPrompt = false;
-          museum.wasNearDoor = false;
         }
 
         // Function to start a new day
@@ -1645,17 +1181,6 @@
           dayTime.currentMinute = 0;
           dayTime.timeInSeconds = 0;
 
-          // Don't show tutorial after first day
-          if (dayTime.currentDay > 0) {
-            tutorial.active = false;
-          }
-
-          // Set oldGuy's first dialogue on first day (replaces tutorial)
-          if (dayTime.currentDay === 0) {
-            oldGuy.dialogue = 'Hey! Over here!';
-            oldGuy.dialogueStage = 0;
-          }
-
           // Reset player to starting position
           player.x = world.width / 2;
           player.y = world.height - 40;
@@ -1676,30 +1201,13 @@
         function update(dtMs) {
           const dt = (dtMs || 16.67) / 1000; // seconds
 
-          // Update candybar boost timer
-          if (gameState === 'playing') {
-            if (candybarBoost.active) {
-              candybarBoost.duration -= dt;
-              if (candybarBoost.duration <= 0) {
-                candybarBoost.active = false;
-                candybarBoost.cooldown = candybarBoost.cooldownTime; // Start cooldown
-              }
-            } else if (candybarBoost.cooldown > 0) {
-              candybarBoost.cooldown -= dt;
-              if (candybarBoost.cooldown < 0) {
-                candybarBoost.cooldown = 0;
-              }
-            }
-          }
-
           // Update day/time system (only when playing)
           if (gameState === 'playing') {
             dayTime.timeInSeconds += dt;
 
-            // Calculate current hour and minute (starts at 0 = midnight)
-            dayTime.currentHour = Math.floor(
-              dayTime.timeInSeconds / dayTime.secondsPerHour
-            );
+            // Calculate current hour and minute
+            dayTime.currentHour =
+              Math.floor(dayTime.timeInSeconds / dayTime.secondsPerHour) + 8;
             dayTime.currentMinute = Math.floor(
               ((dayTime.timeInSeconds % dayTime.secondsPerHour) /
                 dayTime.secondsPerHour) *
@@ -1708,188 +1216,19 @@
 
             // Check if day should end (6 PM = 18:00)
             if (dayTime.currentHour >= dayTime.dayEndHour) {
-              // Go to museum (except Sunday/after Sunday)
-              if (dayTime.currentDay < 6) {
-                // Not Sunday yet, go to museum
-                gameState = 'museum';
-                initializeMuseum();
-              } else {
-                // Sunday or later, go to dayEnd (week end)
-                gameState = 'dayEnd';
-              }
+              gameState = 'dayEnd';
               // Stop player movement
               player.vx = 0;
               player.vy = 0;
             }
           }
 
-          // Update museum (separate from playing state)
-          if (gameState === 'museum' && !museum.doorPrompt) {
-            const museumTileSize = tileSize;
-            const museumWorldWidth = museum.width * museumTileSize;
-            const museumWorldHeight = museum.height * museumTileSize;
-
-            // Player movement in museum - disable movement if dialogue is showing
-            // Declare variables outside if/else so they're available for animation/stamina updates
-            const wantsSprint = pressed('ShiftLeft') || pressed('ShiftRight');
-            const hasInput =
-              pressed('ArrowLeft') ||
-              pressed('KeyA') ||
-              pressed('ArrowRight') ||
-              pressed('KeyD') ||
-              pressed('ArrowUp') ||
-              pressed('KeyW') ||
-              pressed('ArrowDown') ||
-              pressed('KeyS');
-            const allowBoost =
-              wantsSprint &&
-              !stamina.exhausted &&
-              stamina.current >= stamina.minToSprint;
-            const shouldDrain =
-              wantsSprint &&
-              !stamina.exhausted &&
-              hasInput &&
-              stamina.current > 0;
-
-            if (curator.dialogue) {
-              // Stop player movement during dialogue
-              player.vx = 0;
-              player.vy = 0;
-            } else {
-              const candybarMultiplier = candybarBoost.active ? 1.5 : 1.0;
-              const accel = allowBoost
-                ? player.accel * player.sprintMultiplier * candybarMultiplier
-                : player.accel * candybarMultiplier;
-              const maxSpeed = allowBoost
-                ? player.maxSpeed * player.sprintMultiplier * candybarMultiplier
-                : player.maxSpeed * candybarMultiplier;
-
-              let ax = 0;
-              let ay = 0;
-              if (pressed('ArrowLeft') || pressed('KeyA')) ax -= accel;
-              if (pressed('ArrowRight') || pressed('KeyD')) ax += accel;
-              if (pressed('ArrowUp') || pressed('KeyW')) ay -= accel;
-              if (pressed('ArrowDown') || pressed('KeyS')) ay += accel;
-
-              player.vx += ax;
-              player.vy += ay;
-
-              if (ax === 0) player.vx *= player.friction;
-              if (ay === 0) player.vy *= player.friction;
-
-              const speed = Math.hypot(player.vx, player.vy);
-              if (speed > maxSpeed) {
-                const s = maxSpeed / speed;
-                player.vx *= s;
-                player.vy *= s;
-              }
-
-              player.x += player.vx;
-              player.y += player.vy;
-            }
-
-            // Museum wall collision (keep player inside museum bounds)
-            const playerRadius = player.width / 2;
-            const wallThickness = museumTileSize;
-            player.x = clamp(
-              player.x,
-              wallThickness + playerRadius,
-              museumWorldWidth - wallThickness - playerRadius
-            );
-            player.y = clamp(
-              player.y,
-              wallThickness + playerRadius,
-              museumWorldHeight - wallThickness - playerRadius
-            );
-
-            // Update camera - follow player horizontally, but keep museum at bottom
-            camera.x += (player.x - camera.x) * camera.followLerp;
-            // Only clamp if museum is larger than canvas (otherwise keep centered horizontally)
-            if (museumWorldWidth > canvas.width) {
-              camera.x = clamp(
-                camera.x,
-                canvas.width / 2,
-                museumWorldWidth - canvas.width / 2
-              );
-            } else {
-              // Museum is smaller than canvas - keep camera centered horizontally
-              camera.x = museumWorldWidth / 2;
-            }
-            // Always keep museum at bottom of screen (don't follow player vertically)
-            if (museumWorldHeight > canvas.height) {
-              // Museum is larger than canvas - allow vertical scrolling but clamp
-              camera.y += (player.y - camera.y) * camera.followLerp;
-              camera.y = clamp(
-                camera.y,
-                canvas.height / 2,
-                museumWorldHeight - canvas.height / 2
-              );
-            } else {
-              // Museum is smaller than canvas - position at bottom middle
-              // Keep camera at position that places museum at bottom
-              camera.y = museumWorldHeight - canvas.height / 2;
-            }
-            camera.x = Math.round(camera.x);
-            camera.y = Math.round(camera.y);
-
-            // Check if player is near door (show prompt only when entering radius)
-            const doorX = museum.doorCol * museumTileSize + museumTileSize / 2;
-            const doorY = (museum.height - 1) * museumTileSize;
-            const dx = player.x - doorX;
-            const dy = player.y - doorY;
-            const distToDoor = Math.sqrt(dx * dx + dy * dy);
-
-            // Smaller activation radius (0.8 tiles)
-            const doorActivationRadius = museumTileSize * 0.8;
-            const wasNearDoor = museum.wasNearDoor || false;
-
-            if (distToDoor < doorActivationRadius) {
-              // Player is near door - show prompt only if we weren't near before
-              if (!wasNearDoor) {
-                museum.doorPrompt = true;
-              }
-              museum.wasNearDoor = true;
-            } else {
-              // Player moved away from door - reset tracking
-              museum.wasNearDoor = false;
-              // Don't hide prompt immediately - let it stay until player clicks or moves
-            }
-
-            // Resolve curator collision (separate function, like other NPCs)
-            resolveCuratorCollision();
-
-            // Update walking animation
-            const isMoving = Math.hypot(player.vx, player.vy) > 0.1;
-            if (isMoving) {
-              const animationMultiplier = allowBoost ? 1.25 : 0.75;
-              walkAnimationFrame +=
-                dt * 60 * walkAnimationSpeed * animationMultiplier;
-            } else {
-              walkAnimationFrame = 0;
-            }
-
-            // Stamina update
-            if (shouldDrain) {
-              stamina.current -= stamina.drainPerSecond * dt;
-            } else {
-              stamina.current += stamina.regenPerSecond * dt;
-            }
-            stamina.current = clamp(stamina.current, 0, stamina.max);
-
-            if (stamina.current <= 0.0001) {
-              stamina.exhausted = true;
-            } else if (stamina.current >= stamina.max - 0.0001) {
-              stamina.exhausted = false;
-            }
-          }
-
-          // Only update player movement if inventory is closed, shop is closed, vending machine is closed, dialogue is not showing, tutorial is not active, crouch animation is not active, and minigame is not active
+          // Only update player movement if inventory is closed, shop is closed, dialogue is not showing, tutorial is not active, crouch animation is not active, and minigame is not active
           // Also don't update if day/week has ended
           if (
             gameState === 'playing' &&
             !inventory.open &&
             !shop.open &&
-            !vendingMachine.open &&
             !shopkeeper.dialogue &&
             !oldGuy.dialogue &&
             !tutorial.active &&
@@ -1921,14 +1260,12 @@
               hasInput &&
               stamina.current > 0;
 
-            // Apply candybar boost (50% speed increase) if active
-            const candybarMultiplier = candybarBoost.active ? 1.5 : 1.0;
             const accel = allowBoost
-              ? player.accel * player.sprintMultiplier * candybarMultiplier
-              : player.accel * candybarMultiplier;
+              ? player.accel * player.sprintMultiplier
+              : player.accel;
             const maxSpeed = allowBoost
-              ? player.maxSpeed * player.sprintMultiplier * candybarMultiplier
-              : player.maxSpeed * candybarMultiplier;
+              ? player.maxSpeed * player.sprintMultiplier
+              : player.maxSpeed;
 
             // Input axes
             let ax = 0;
@@ -1959,8 +1296,6 @@
             resolveTreeCollisions();
             resolveShopkeeperCollision();
             resolveOldGuyCollision();
-            resolveCandyKidCollision();
-            resolveVendingMachineCollision();
 
             // Update walking animation with speed based on sprinting
             const isMoving = Math.hypot(player.vx, player.vy) > 0.1;
@@ -2020,14 +1355,10 @@
           // Update crouch animation
           if (crouchAnimation.active) {
             const dt = dtMs / 1000; // Convert to seconds
-            // Apply candybar boost: 50% faster digging = 50% less duration
-            const effectiveDuration = candybarBoost.active
-              ? crouchAnimation.duration * 0.5
-              : crouchAnimation.duration;
             crouchAnimation.timer += dt;
 
             // Create particles during animation (small dirt particles)
-            if (crouchAnimation.timer < effectiveDuration) {
+            if (crouchAnimation.timer < crouchAnimation.duration) {
               // Emit particles continuously during animation
               const particleEmitRate = 30; // particles per second
               const particlesToEmit = particleEmitRate * dt;
@@ -2061,8 +1392,8 @@
               }
             }
 
-            // After animation duration, start the pending minigame (if any) or just end animation
-            if (crouchAnimation.timer >= effectiveDuration) {
+            // After 1 second, start the pending minigame (if any) or just end animation
+            if (crouchAnimation.timer >= crouchAnimation.duration) {
               if (crouchAnimation.pendingMinigame) {
                 startPendingMinigame();
               } else {
@@ -2231,71 +1562,14 @@
           }
         }
 
-        function resolveCandyKidCollision() {
-          const playerRadius = player.radius; // Use cached radius
-          const dx = player.x - candyKid.x;
-          const dy = player.y - candyKid.y;
-          const distSq = dx * dx + dy * dy;
-          const minDist = candyKid.radius + playerRadius;
-          const minDistSq = minDist * minDist;
-
-          if (distSq < minDistSq && distSq > 0) {
-            const dist = Math.sqrt(distSq);
-            const overlap = minDist - dist;
-            const invDist = 1 / dist; // Cache inverse distance
-            player.x += dx * invDist * overlap;
-            player.y += dy * invDist * overlap;
-          }
-        }
-
-        function resolveCuratorCollision() {
-          const playerRadius = player.radius; // Use cached radius
-          const dx = player.x - curator.x;
-          const dy = player.y - curator.y;
-          const distSq = dx * dx + dy * dy;
-          const minDist = curator.radius + playerRadius;
-          const minDistSq = minDist * minDist;
-
-          if (distSq < minDistSq && distSq > 0) {
-            const dist = Math.sqrt(distSq);
-            const overlap = minDist - dist;
-            const invDist = 1 / dist; // Cache inverse distance
-            player.x += dx * invDist * overlap;
-            player.y += dy * invDist * overlap;
-          }
-        }
-
-        function resolveVendingMachineCollision() {
-          const playerRadius = player.radius; // Use cached radius
-          const dx = player.x - vendingMachine.x;
-          const dy = player.y - vendingMachine.y;
-          const distSq = dx * dx + dy * dy;
-          const minDist = vendingMachine.radius + playerRadius;
-          const minDistSq = minDist * minDist;
-
-          if (distSq < minDistSq && distSq > 0) {
-            const dist = Math.sqrt(distSq);
-            const overlap = minDist - dist;
-            const invDist = 1 / dist; // Cache inverse distance
-            player.x += dx * invDist * overlap;
-            player.y += dy * invDist * overlap;
-          }
-        }
-
         function advanceShopkeeperDialogue() {
           if (shopkeeper.dialogueStage === 1) {
             // After "Hello!", check if player has money
             if (money.amount > 0) {
-              // Player has money - show shop message first time, or "What would you like?" if already talked
-              if (shopkeeper.hasTalkedOnce) {
-                shopkeeper.dialogue = 'What would you like?';
-                shopkeeper.dialogueStage = 2;
-              } else {
-                shopkeeper.dialogue =
-                  'I see you have some cash on you. You can buy shovels from my shop for extra cash, or a radar to find hidden objects.';
-                shopkeeper.dialogueStage = 2;
-                shopkeeper.hasTalkedOnce = true; // Mark that we've talked once
-              }
+              // Player has money - show shop message
+              shopkeeper.dialogue =
+                'I see you have some cash on you. You can buy shovels from my shop for extra cash, or a radar to find hidden objects.';
+              shopkeeper.dialogueStage = 2;
             } else {
               // Player has no money - tell them to go dig
               shopkeeper.dialogue =
@@ -2315,30 +1589,6 @@
             // Close dialogue after "no money" message
             shopkeeper.dialogue = null;
             shopkeeper.dialogueStage = 0;
-          }
-        }
-
-        function advanceCandyKidDialogue() {
-          if (candyKid.dialogueStage === 1) {
-            // First dialogue sequence
-            if (candyKid.dialogue === 'C- C- Candy...') {
-              candyKid.dialogue =
-                'So hyper... I can do things so much faster than before...';
-            } else if (
-              candyKid.dialogue ===
-              'So hyper... I can do things so much faster than before...'
-            ) {
-              candyKid.dialogue = 'But at what cost...';
-            } else if (candyKid.dialogue === 'But at what cost...') {
-              // Close dialogue after last message
-              candyKid.dialogue = null;
-              candyKid.dialogueStage = 0;
-              candyKid.hasTalkedOnce = true;
-            }
-          } else if (candyKid.dialogueStage === 2) {
-            // Second time talking - just "Candy..."
-            candyKid.dialogue = null;
-            candyKid.dialogueStage = 0;
           }
         }
 
@@ -2370,32 +1620,6 @@
           }
         }
 
-        function advanceCuratorDialogue() {
-          // Curator dialogue advances through stages
-          curator.dialogueStage++;
-          const hasArtifacts = inventory.slots.some((slot) => slot !== null);
-
-          if (hasArtifacts) {
-            // Player has artifacts - three stages (0, 1, 2)
-            if (curator.dialogueStage === 1) {
-              curator.dialogue =
-                'Press "E" to go into build mode, there you can create display cases for the things you\'ve dug up.';
-            } else if (curator.dialogueStage >= 2) {
-              curator.dialogue = null;
-              curator.dialogueStage = 0;
-            }
-          } else {
-            // Player has no artifacts - three stages (0, 1, 2)
-            if (curator.dialogueStage === 1) {
-              curator.dialogue =
-                "Dig up the Purple X's with your shovel to get one!";
-            } else if (curator.dialogueStage >= 2) {
-              curator.dialogue = null;
-              curator.dialogueStage = 0;
-            }
-          }
-        }
-
         function handleInteraction() {
           // Don't interact if inventory is open
           if (inventory.open) {
@@ -2403,54 +1627,12 @@
           }
 
           // Don't start new dialogue if one is already showing
-          if (
-            shopkeeper.dialogue ||
-            oldGuy.dialogue ||
-            candyKid.dialogue ||
-            curator.dialogue
-          ) {
-            return;
-          }
-
-          const playerRadius = player.radius; // Use cached radius
-
-          // Check if player is touching curator (collision-based, only in museum state)
-          // Completely rewritten - check curator FIRST, exactly like shopkeeper pattern
-          if (gameState === 'museum') {
-            // Calculate distance to curator
-            const dx = player.x - curator.x;
-            const dy = player.y - curator.y;
-            const distSq = dx * dx + dy * dy;
-            const minDist = curator.radius + playerRadius;
-            const minDistSq = minDist * minDist;
-
-            // Allow interaction when very close (within collision distance + small buffer)
-            if (distSq <= minDistSq * 1.2) {
-              // Check if player has any artifacts
-              const hasArtifacts = inventory.slots.some(
-                (slot) => slot !== null
-              );
-
-              if (hasArtifacts) {
-                curator.dialogue =
-                  'Hello there! I see you have some artifacts.';
-                curator.dialogueStage = 1;
-              } else {
-                curator.dialogue =
-                  "Looks like you don't have anything to put in your museum.";
-                curator.dialogueStage = 1;
-              }
-              curator.dialogueTimer = 0; // Don't auto-close, wait for Spacebar press
-              // Kill momentum when opening dialogue
-              player.vx = 0;
-              player.vy = 0;
-              return;
-            }
-            // If in museum state but not close to curator, return (no other NPCs in museum)
+          if (shopkeeper.dialogue || oldGuy.dialogue) {
             return;
           }
 
           // Check if player is touching old guy (collision-based)
+          const playerRadius = player.radius; // Use cached radius
           let dx = player.x - oldGuy.x;
           let dy = player.y - oldGuy.y;
           let distSq = dx * dx + dy * dy;
@@ -2475,44 +1657,6 @@
             return;
           }
 
-          // Check if player is touching candy kid (collision-based)
-          dx = player.x - candyKid.x;
-          dy = player.y - candyKid.y;
-          distSq = dx * dx + dy * dy;
-          minDist = candyKid.radius + playerRadius;
-          minDistSq = minDist * minDist;
-
-          if (distSq <= minDistSq * 1.2) {
-            // Show candy kid dialogue
-            if (!candyKid.hasTalkedOnce) {
-              candyKid.dialogue = 'C- C- Candy...';
-              candyKid.dialogueStage = 1;
-            } else {
-              candyKid.dialogue = 'Candy...';
-              candyKid.dialogueStage = 2;
-            }
-            candyKid.dialogueTimer = 0; // Don't auto-close, wait for Spacebar press
-            // Kill momentum when opening dialogue
-            player.vx = 0;
-            player.vy = 0;
-            return;
-          }
-
-          // Check if player is touching vending machine (collision-based)
-          dx = player.x - vendingMachine.x;
-          dy = player.y - vendingMachine.y;
-          distSq = dx * dx + dy * dy;
-          minDist = vendingMachine.radius + playerRadius;
-          minDistSq = minDist * minDist;
-
-          if (distSq <= minDistSq * 1.2) {
-            // Open vending machine shop
-            vendingMachine.open = true;
-            player.vx = 0;
-            player.vy = 0;
-            return;
-          }
-
           // Check if player is touching shopkeeper (collision-based)
           dx = player.x - shopkeeper.x;
           dy = player.y - shopkeeper.y;
@@ -2522,7 +1666,7 @@
 
           // Allow interaction when very close (within collision distance + small buffer)
           if (distSq <= minDistSq * 1.2) {
-            shopkeeper.dialogue = "Go find some X's to dig for cash";
+            shopkeeper.dialogue = 'Hello!';
             shopkeeper.dialogueStage = 1;
             shopkeeper.dialogueTimer = 0; // Don't auto-close, wait for Spacebar press
             // Kill momentum when opening dialogue
@@ -2532,12 +1676,6 @@
           }
 
           // Check if player is on a tile (any tile triggers crouch animation)
-          // Only allow digging in 'playing' state (not in museum or other states)
-          if (gameState !== 'playing') {
-            // Still allow Space for dialogue/interactions in other states
-            return;
-          }
-
           const col = Math.floor(player.x / tileSize);
           const row = Math.floor(player.y / tileSize);
 
@@ -2549,30 +1687,8 @@
                 crouchAnimation.active = true;
                 crouchAnimation.timer = 0;
                 crouchAnimation.particles = []; // Initialize particles array
-                // Only store minigame if on red X, secret X, or purple X tile, otherwise just play animation
-                // Purple X requires tier 6 shovel (Purple X Shovel)
-                if (tile.name === 'purpleX') {
-                  // Check if player has the Purple X Shovel (tier 6)
-                  if (
-                    !inventory.equipment ||
-                    inventory.equipment.tier !== 6 ||
-                    inventory.equipment.type !== 'shovel'
-                  ) {
-                    // Player doesn't have the right shovel - don't allow digging
-                    crouchAnimation.active = false;
-                    return;
-                  }
-                  // Player has the right shovel - treat like redX
-                  const minigameRoll = Math.random();
-                  if (minigameRoll < 0.4) {
-                    crouchAnimation.pendingMinigame = 'balancing';
-                  } else if (minigameRoll < 0.8) {
-                    crouchAnimation.pendingMinigame = 'declaration';
-                  } else {
-                    crouchAnimation.pendingMinigame = 'brushing';
-                  }
-                  crouchAnimation.isSecretX = false; // Purple X acts like regular X
-                } else if (tile.name === 'redX' || tile.name === 'secretX') {
+                // Only store minigame if on red X or secret X tile, otherwise just play animation
+                if (tile.name === 'redX' || tile.name === 'secretX') {
                   // Store which minigame to start after animation
                   // Probabilities: 40% balancing (pots), 40% declaration (typo), 20% brushing
                   const minigameRoll = Math.random();
@@ -2647,31 +1763,7 @@
             brushingMinigame.dirtLevel = 1.0;
             brushingMinigame.redness = 0;
             brushingMinigame.timeHoldingSpace = 0;
-            // Check if player has speed brush equipped or in inventory
-            let hasSpeedBrush = false;
-            if (
-              inventory.equipment &&
-              inventory.equipment.name === 'Speed Brush'
-            ) {
-              hasSpeedBrush = true;
-            }
-            for (let i = 0; i < inventory.slots.length; i++) {
-              if (
-                inventory.slots[i] &&
-                inventory.slots[i].name === 'Speed Brush'
-              ) {
-                hasSpeedBrush = true;
-                break;
-              }
-            }
-            // Speed brush: red trigger time is 2-4 seconds (instead of 3-8)
-            if (hasSpeedBrush) {
-              brushingMinigame.redTriggerTime = 2 + Math.random() * 2; // 2-4 seconds
-              brushingMinigame.perfectReleaseWindow = 0.75; // 0.75 seconds (instead of 0.5)
-            } else {
-              brushingMinigame.redTriggerTime = 3 + Math.random() * 5; // 3-8 seconds
-              brushingMinigame.perfectReleaseWindow = 0.5; // 0.5 seconds
-            }
+            brushingMinigame.redTriggerTime = 3 + Math.random() * 5;
             brushingMinigame.timeSinceRed = 0;
             brushingMinigame.particles = [];
             brushingMinigame.completed = false;
@@ -2868,14 +1960,6 @@
                     name: grassDef.name,
                     canvas: createTileCanvas(grassDef.draw),
                   };
-                // Remove from discovered secret X list if it was a secret X tile
-                radar.discoveredSecretX = radar.discoveredSecretX.filter(
-                  (pos) =>
-                    !(
-                      pos.row === balancingMinigame.tileRow &&
-                      pos.col === balancingMinigame.tileCol
-                    )
-                );
               }
               balancingMinigame.active = false;
               balancingMinigame.breaking = false;
@@ -2917,14 +2001,6 @@
                 name: grassDef.name,
                 canvas: createTileCanvas(grassDef.draw),
               };
-              // Remove from discovered secret X list if it was a secret X tile
-              radar.discoveredSecretX = radar.discoveredSecretX.filter(
-                (pos) =>
-                  !(
-                    pos.row === balancingMinigame.tileRow &&
-                    pos.col === balancingMinigame.tileCol
-                  )
-              );
             }
             balancingMinigame.active = false;
           }
@@ -3106,14 +2182,6 @@
                 name: grassDef.name,
                 canvas: createTileCanvas(grassDef.draw),
               };
-              // Remove from discovered secret X list if it was a secret X tile
-              radar.discoveredSecretX = radar.discoveredSecretX.filter(
-                (pos) =>
-                  !(
-                    pos.row === brushingMinigame.tileRow &&
-                    pos.col === brushingMinigame.tileCol
-                  )
-              );
             }
 
             brushingMinigame.active = false;
@@ -3192,14 +2260,6 @@
                 name: grassDef.name,
                 canvas: createTileCanvas(grassDef.draw),
               };
-            // Remove from discovered secret X list if it was a secret X tile
-            radar.discoveredSecretX = radar.discoveredSecretX.filter(
-              (pos) =>
-                !(
-                  pos.row === declarationMinigame.tileRow &&
-                  pos.col === declarationMinigame.tileCol
-                )
-            );
           }
 
           // Close minigame after a short delay to show result
@@ -3215,14 +2275,6 @@
 
         function updateRadar(dtMs) {
           if (!radar.active) return;
-          // Don't fire radar while in any menu
-          if (
-            inventory.open ||
-            shop.open ||
-            (typeof vendingMachine !== 'undefined' && vendingMachine.open)
-          ) {
-            return;
-          }
 
           const dt = dtMs / 1000; // Convert to seconds
 
@@ -3262,8 +2314,6 @@
                 maxLife: 3.0, // Ring lasts 3 seconds
                 foundSecretX: false, // Whether this ring found a secret X
                 secretXPos: null, // Position of found secret X
-                foundPurpleX: false, // Whether this ring found a purple X
-                purpleXPos: null, // Position of found purple X
               });
               radar.ringTimer = 0; // Reset timer
             }
@@ -3318,23 +2368,6 @@
                     });
                   }
                 }
-                // Check for purple X
-                if (tile && tile.name === 'purpleX') {
-                  // Found a purple X! Make ring return to player
-                  ring.foundPurpleX = true;
-                  ring.purpleXPos = { x: ring.x, y: ring.y };
-
-                  // Mark this purple X as discovered (avoid duplicates)
-                  const alreadyDiscovered = radar.discoveredPurpleX.some(
-                    (pos) => pos.row === ringRow && pos.col === ringCol
-                  );
-                  if (!alreadyDiscovered) {
-                    radar.discoveredPurpleX.push({
-                      row: ringRow,
-                      col: ringCol,
-                    });
-                  }
-                }
               }
             }
 
@@ -3352,10 +2385,60 @@
           }
         }
 
-        // Load New_Tree sprite
-        const treeSprite = new Image();
-        treeSprite.imageSmoothingEnabled = false;
-        treeSprite.src = 'assets/sprites/New_Tree.png';
+        const treeSprite = (() => {
+          const canvasEl = document.createElement('canvas');
+          canvasEl.width = tileCell * 8;
+          canvasEl.height = tileCell * 8;
+          const c = canvasEl.getContext('2d');
+          const treeLayout = [
+            { x: 1, y: 0, color: '#0a3c0f' },
+            { x: 2, y: 0, color: '#0a3c0f' },
+            { x: 3, y: 0, color: '#0a3c0f' },
+            { x: 4, y: 0, color: '#0a3c0f' },
+            { x: 5, y: 0, color: '#0a3c0f' },
+            { x: 0, y: 1, color: '#0a3c0f' },
+            { x: 1, y: 1, color: '#075018' },
+            { x: 2, y: 1, color: '#0a5f1f' },
+            { x: 3, y: 1, color: '#0a5f1f' },
+            { x: 4, y: 1, color: '#075018' },
+            { x: 5, y: 1, color: '#075018' },
+            { x: 6, y: 1, color: '#0a3c0f' },
+            { x: 0, y: 2, color: '#0a3c0f' },
+            { x: 1, y: 2, color: '#0a5f1f' },
+            { x: 2, y: 2, color: '#0c6b24' },
+            { x: 3, y: 2, color: '#0c6b24' },
+            { x: 4, y: 2, color: '#0a5f1f' },
+            { x: 5, y: 2, color: '#075018' },
+            { x: 6, y: 2, color: '#0a3c0f' },
+            { x: 0, y: 3, color: '#0a3c0f' },
+            { x: 1, y: 3, color: '#0a5f1f' },
+            { x: 2, y: 3, color: '#0c6b24' },
+            { x: 3, y: 3, color: '#0c6b24' },
+            { x: 4, y: 3, color: '#0a5f1f' },
+            { x: 5, y: 3, color: '#075018' },
+            { x: 6, y: 3, color: '#0a3c0f' },
+            { x: 0, y: 4, color: '#0a3c0f' },
+            { x: 1, y: 4, color: '#0a5f1f' },
+            { x: 2, y: 4, color: '#0c6b24' },
+            { x: 3, y: 4, color: '#0c6b24' },
+            { x: 4, y: 4, color: '#0a5f1f' },
+            { x: 5, y: 4, color: '#075018' },
+            { x: 6, y: 4, color: '#0a3c0f' },
+            { x: 1, y: 5, color: '#0a3c0f' },
+            { x: 2, y: 5, color: '#0a5f1f' },
+            { x: 3, y: 5, color: '#0a5f1f' },
+            { x: 4, y: 5, color: '#075018' },
+            { x: 5, y: 5, color: '#0a3c0f' },
+            { x: 2, y: 6, color: '#0a3c0f' },
+            { x: 3, y: 6, color: '#063310' },
+            { x: 4, y: 6, color: '#0a3c0f' },
+            { x: 2, y: 7, color: '#0a3c0f' },
+            { x: 3, y: 7, color: '#063310' },
+            { x: 4, y: 7, color: '#0a3c0f' },
+          ];
+          treeLayout.forEach(({ x, y, color }) => fillCell(c, x, y, color));
+          return canvasEl;
+        })();
 
         // Load shovel sprites from PNG images
         const shovelSprites = {};
@@ -3367,10 +2450,10 @@
           return sprite;
         }
 
-        // Load shovel sprites for each tier (Multipliers)
-        loadShovelSprite(1, 'assets/sprites/Trowel.png'); // Simple trowel
-        loadShovelSprite(2, 'assets/sprites/Electric_Brush.png'); // Electric brush
-        loadShovelSprite(3, 'assets/sprites/steel-shovel.png'); // Iron Sieve (placeholder)
+        // Load shovel sprites for each tier
+        loadShovelSprite(1, 'assets/sprites/shovel.png'); // Simple shovel
+        loadShovelSprite(2, 'assets/sprites/iron-shovel.png'); // Iron Shovel
+        loadShovelSprite(3, 'assets/sprites/steel-shovel.png'); // Steel Shovel
         // Add more shovel sprites as needed for other tiers
 
         // Load radar sprites (optimized: set imageSmoothingEnabled before src)
@@ -3394,47 +2477,6 @@
         radarRingSprite.imageSmoothingEnabled = false;
         radarRingSprite.src = 'assets/sprites/Radar_Ring.png';
 
-        // Initialize allSprites array after ALL sprites are defined
-        allSprites = [
-          potSprite,
-          potTallTanSprite,
-          potShortGreySprite,
-          potPoleSprite,
-          brushSprite,
-          speedBrushSprite,
-          candyKidSprite,
-          dirtSprite,
-          moneyBorderSprite,
-          grassSprite,
-          flowerSprite,
-          rock1Sprite,
-          rock2Sprite,
-          newXSprite,
-          newBushSprite,
-          oldGuySprite,
-          shopkeeperSprite,
-          curatorSprite,
-          vendingMachineSprite,
-          chocolateBarSprite,
-          floorTileSprite,
-          wallTileSprite,
-          wallDoorSprite,
-          playerSpriteIdle,
-          playerSpriteBack,
-          playerSpriteBackWalk1,
-          playerSpriteBackWalk2,
-          playerSpriteWalk1,
-          playerSpriteWalk2,
-          playerSpriteCrouch1,
-          playerSpriteCrouch2,
-          radarSprite,
-          radarSpriteRight,
-          radarSpriteLeft,
-          radarSpriteDown,
-          radarRingSprite,
-          treeSprite,
-        ];
-
         // Radar system
         const radar = {
           active: false, // Whether player owns radar
@@ -3443,7 +2485,6 @@
           ringTimer: 0, // Timer for next ring
           rings: [], // Active radar rings
           discoveredSecretX: [], // Array of discovered secret X positions {row, col}
-          discoveredPurpleX: [], // Array of discovered purple X positions {row, col}
           lastDirection: { x: 0, y: -1 }, // Last movement direction (default: up)
           lastSpriteDirection: 'up', // Last sprite direction: 'up', 'down', 'left', 'right'
         };
@@ -3457,17 +2498,8 @@
           const viewRight = camera.x + halfCanvasW;
           const viewBottom = camera.y + halfCanvasH;
           const padding = 120; // Extra padding to account for tree size
-          // Use tree sprite dimensions (fallback to tileCell8 if not loaded yet)
-          const spriteWidth =
-            treeSprite.complete && treeSprite.naturalWidth > 0
-              ? treeSprite.width
-              : tileCell * 8;
-          const spriteHeight =
-            treeSprite.complete && treeSprite.naturalHeight > 0
-              ? treeSprite.height
-              : tileCell * 8;
-          const spriteHalfW = spriteWidth / 2;
-          const spriteHalfH = spriteHeight / 2;
+          const spriteHalfW = treeSprite.width / 2;
+          const spriteHalfH = treeSprite.height / 2;
           const tileCell8 = tileCell * 8;
 
           ctx.save();
@@ -3506,16 +2538,9 @@
             ctx.fill();
 
             // Draw tree
-            if (treeSprite.complete && treeSprite.naturalWidth > 0) {
-              const scale = tree.size / treeSprite.height; // Use actual sprite height for scaling
-              ctx.scale(scale, scale);
-              ctx.imageSmoothingEnabled = false;
-              ctx.drawImage(
-                treeSprite,
-                -treeSprite.width / 2,
-                -treeSprite.height / 2
-              );
-            }
+            const scale = tree.size / tileCell8;
+            ctx.scale(scale, scale);
+            ctx.drawImage(treeSprite, -spriteHalfW, -spriteHalfH);
             ctx.restore();
           }
 
@@ -3581,59 +2606,6 @@
           ctx.restore();
         }
 
-        function drawCandyKid() {
-          ctx.save();
-
-          // Draw candy kid sprite
-          if (candyKidSprite.complete && candyKidSprite.naturalWidth > 0) {
-            const spriteWidth = 43; // Match player size
-            const spriteHeight = 43;
-
-            // Candy kid shadow
-            ctx.fillStyle = 'rgba(0,0,0,0.25)';
-            ctx.beginPath();
-            ctx.ellipse(
-              candyKid.x,
-              candyKid.y + spriteHeight * 0.35,
-              spriteWidth * 0.5,
-              spriteHeight * 0.22,
-              0,
-              0,
-              Math.PI * 2
-            );
-            ctx.fill();
-
-            const px = Math.round(candyKid.x - spriteWidth / 2);
-            const py = Math.round(candyKid.y - spriteHeight / 2);
-            ctx.imageSmoothingEnabled = false;
-            ctx.drawImage(candyKidSprite, px, py, spriteWidth, spriteHeight);
-          } else {
-            // Fallback while loading
-            ctx.fillStyle = 'rgba(0,0,0,0.25)';
-            ctx.beginPath();
-            ctx.ellipse(
-              candyKid.x,
-              candyKid.y + candyKid.radius * 0.4,
-              candyKid.radius * 0.6,
-              candyKid.radius * 0.2,
-              0,
-              0,
-              Math.PI * 2
-            );
-            ctx.fill();
-
-            ctx.fillStyle = '#ff69b4'; // Pink color
-            ctx.strokeStyle = '#ff1493';
-            ctx.lineWidth = 2;
-            ctx.beginPath();
-            ctx.arc(candyKid.x, candyKid.y, candyKid.radius, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.stroke();
-          }
-
-          ctx.restore();
-        }
-
         function drawOldGuy() {
           ctx.save();
 
@@ -3661,74 +2633,6 @@
             const py = Math.round(oldGuy.y - spriteHeight / 2);
             ctx.imageSmoothingEnabled = false;
             ctx.drawImage(oldGuySprite, px, py, spriteWidth, spriteHeight);
-          }
-
-          ctx.restore();
-        }
-
-        function drawVendingMachine() {
-          ctx.save();
-
-          // Draw vending machine sprite
-          if (
-            vendingMachineSprite.complete &&
-            vendingMachineSprite.naturalWidth > 0
-          ) {
-            // Scale bigger than player (50% larger)
-            const spriteWidth = 65; // Bigger (was 43)
-            const spriteHeight = 65; // Bigger (was 43)
-
-            // Vending machine shadow
-            ctx.fillStyle = 'rgba(0,0,0,0.25)';
-            ctx.beginPath();
-            ctx.ellipse(
-              vendingMachine.x,
-              vendingMachine.y + spriteHeight * 0.35,
-              spriteWidth * 0.5,
-              spriteHeight * 0.22,
-              0,
-              0,
-              Math.PI * 2
-            );
-            ctx.fill();
-
-            const px = Math.round(vendingMachine.x - spriteWidth / 2);
-            const py = Math.round(vendingMachine.y - spriteHeight / 2);
-            ctx.imageSmoothingEnabled = false;
-            ctx.drawImage(
-              vendingMachineSprite,
-              px,
-              py,
-              spriteWidth,
-              spriteHeight
-            );
-          } else {
-            // Fallback: draw grey rectangle if sprite didn't load
-            ctx.fillStyle = 'rgba(0,0,0,0.25)';
-            ctx.beginPath();
-            ctx.ellipse(
-              vendingMachine.x,
-              vendingMachine.y + vendingMachine.radius * 0.4,
-              vendingMachine.radius * 0.6,
-              vendingMachine.radius * 0.2,
-              0,
-              0,
-              Math.PI * 2
-            );
-            ctx.fill();
-
-            ctx.fillStyle = '#606060';
-            ctx.strokeStyle = '#808080';
-            ctx.lineWidth = 2;
-            ctx.beginPath();
-            ctx.rect(
-              vendingMachine.x - vendingMachine.radius,
-              vendingMachine.y - vendingMachine.radius,
-              vendingMachine.radius * 2,
-              vendingMachine.radius * 2
-            );
-            ctx.fill();
-            ctx.stroke();
           }
 
           ctx.restore();
@@ -3780,21 +2684,14 @@
           }
 
           // Draw radar sprite (appears in front of player, same size as player)
-          const radarSize = player.width; // Same size as player (43x43)
-          const px = Math.round(radar.x - radarSize / 2);
-          const py = Math.round(radar.y - radarSize / 2);
           if (
             currentRadarSprite.complete &&
             currentRadarSprite.naturalWidth > 0
           ) {
+            const radarSize = player.width; // Same size as player (43x43)
+            const px = Math.round(radar.x - radarSize / 2);
+            const py = Math.round(radar.y - radarSize / 2);
             ctx.drawImage(currentRadarSprite, px, py, radarSize, radarSize);
-          } else {
-            // Fallback: draw grey square if sprite didn't load (for missing Radar-2, Radar-3, Radar-4 sprites)
-            ctx.fillStyle = '#808080'; // Grey color
-            ctx.fillRect(px, py, radarSize, radarSize);
-            ctx.strokeStyle = '#606060'; // Darker grey border
-            ctx.lineWidth = 2;
-            ctx.strokeRect(px, py, radarSize, radarSize);
           }
 
           // Draw radar rings (bigger)
@@ -3812,377 +2709,55 @@
             ctx.globalAlpha = 1.0; // Reset alpha
           }
 
-          // Draw New_X sprite markers for all discovered secret X tiles
-          ctx.imageSmoothingEnabled = false;
+          // Draw yellow X markers for all discovered secret X tiles
+          ctx.fillStyle = '#ffff00'; // Yellow color
+          ctx.strokeStyle = '#ffff00';
+          ctx.lineWidth = 2;
           for (let i = 0; i < radar.discoveredSecretX.length; i++) {
             const pos = radar.discoveredSecretX[i];
             const worldX = (pos.col + 0.5) * tileSize;
             const worldY = (pos.row + 0.5) * tileSize;
 
-            // Draw New_X sprite
-            if (newXSprite.complete && newXSprite.naturalWidth > 0) {
-              ctx.drawImage(
-                newXSprite,
-                worldX - tileSize / 2,
-                worldY - tileSize / 2,
-                tileSize,
-                tileSize
-              );
-            }
-          }
+            // Draw X shape (hue-shifted red X to yellow)
+            const maxIndex = cellsPerTile - 1;
+            const cellSize = tileSize / cellsPerTile;
+            for (let y = 0; y < cellsPerTile; y++) {
+              for (let x = 0; x < cellsPerTile; x++) {
+                const diag1 = Math.abs(x - y);
+                const diag2 = Math.abs(x + y - maxIndex);
+                const onX = diag1 <= 1 || diag2 <= 1;
+                if (!onX) continue;
 
-          ctx.restore();
-        }
+                let color = '#ffff00'; // Yellow base
+                if (diag1 === 0 && diag2 === 0) {
+                  color = '#ffff88'; // Brighter yellow center
+                } else if (
+                  diag1 === 1 ||
+                  diag2 === 1 ||
+                  x === 0 ||
+                  y === 0 ||
+                  x === maxIndex ||
+                  y === maxIndex
+                ) {
+                  color = '#cccc00'; // Darker yellow edges
+                }
 
-        function drawMuseum() {
-          ctx.save();
-          ctx.imageSmoothingEnabled = false;
-
-          const museumTileSize = tileSize;
-          const museumWorldWidth = museum.width * museumTileSize;
-          const museumWorldHeight = museum.height * museumTileSize;
-
-          // Calculate offset to center museum horizontally and place it at bottom
-          // Museum is 320x320, canvas is 800x500
-          // To center horizontally: offsetX = (canvas.width - museumWorldWidth) / 2
-          // To place at bottom: offsetY = canvas.height - museumWorldHeight
-          const offsetX = (canvas.width - museumWorldWidth) / 2;
-          const offsetY = canvas.height - museumWorldHeight;
-          ctx.translate(offsetX, offsetY);
-
-          // Draw floor tiles (10x10 grid)
-          for (let row = 0; row < museum.height; row++) {
-            for (let col = 0; col < museum.width; col++) {
-              const tileX = col * museumTileSize;
-              const tileY = row * museumTileSize;
-
-              // Draw floor tile
-              if (
-                floorTileSprite.complete &&
-                floorTileSprite.naturalWidth > 0
-              ) {
-                ctx.drawImage(
-                  floorTileSprite,
-                  tileX,
-                  tileY,
-                  museumTileSize,
-                  museumTileSize
-                );
-              } else {
-                // Fallback grey floor
-                ctx.fillStyle = '#808080';
-                ctx.fillRect(tileX, tileY, museumTileSize, museumTileSize);
-              }
-            }
-          }
-
-          // Draw walls (top, left, right, bottom)
-          // Top wall
-          for (let col = 0; col < museum.width; col++) {
-            const tileX = col * museumTileSize;
-            const tileY = 0;
-            if (wallTileSprite.complete && wallTileSprite.naturalWidth > 0) {
-              ctx.drawImage(
-                wallTileSprite,
-                tileX,
-                tileY,
-                museumTileSize,
-                museumTileSize
-              );
-            }
-          }
-          // Left wall
-          for (let row = 0; row < museum.height; row++) {
-            const tileX = 0;
-            const tileY = row * museumTileSize;
-            if (wallTileSprite.complete && wallTileSprite.naturalWidth > 0) {
-              ctx.drawImage(
-                wallTileSprite,
-                tileX,
-                tileY,
-                museumTileSize,
-                museumTileSize
-              );
-            }
-          }
-          // Right wall
-          for (let row = 0; row < museum.height; row++) {
-            const tileX = (museum.width - 1) * museumTileSize;
-            const tileY = row * museumTileSize;
-            if (wallTileSprite.complete && wallTileSprite.naturalWidth > 0) {
-              ctx.drawImage(
-                wallTileSprite,
-                tileX,
-                tileY,
-                museumTileSize,
-                museumTileSize
-              );
-            }
-          }
-          // Bottom wall (with door in middle)
-          for (let col = 0; col < museum.width; col++) {
-            const tileX = col * museumTileSize;
-            const tileY = (museum.height - 1) * museumTileSize;
-
-            if (col === museum.doorCol) {
-              // Draw door sprite
-              if (wallDoorSprite.complete && wallDoorSprite.naturalWidth > 0) {
-                ctx.drawImage(
-                  wallDoorSprite,
-                  tileX,
-                  tileY,
-                  museumTileSize,
-                  museumTileSize
-                );
-              } else {
-                // Fallback door (different color)
-                ctx.fillStyle = '#654321';
-                ctx.fillRect(tileX, tileY, museumTileSize, museumTileSize);
-              }
-            } else {
-              // Draw wall tile
-              if (wallTileSprite.complete && wallTileSprite.naturalWidth > 0) {
-                ctx.drawImage(
-                  wallTileSprite,
-                  tileX,
-                  tileY,
-                  museumTileSize,
-                  museumTileSize
+                ctx.fillStyle = color;
+                ctx.fillRect(
+                  worldX - tileSize / 2 + x * cellSize,
+                  worldY - tileSize / 2 + y * cellSize,
+                  cellSize,
+                  cellSize
                 );
               }
             }
           }
-
-          ctx.restore();
-        }
-
-        function drawMuseumDoorPrompt() {
-          ctx.save();
-
-          // Background overlay
-          ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-          ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-          // Prompt panel
-          const panelWidth = 400;
-          const panelHeight = 200;
-          const panelX = (canvas.width - panelWidth) / 2;
-          const panelY = (canvas.height - panelHeight) / 2;
-
-          ctx.fillStyle = 'rgba(8, 16, 12, 0.95)';
-          ctx.fillRect(panelX, panelY, panelWidth, panelHeight);
-
-          ctx.strokeStyle = '#ffffff';
-          ctx.lineWidth = 3;
-          ctx.strokeRect(panelX, panelY, panelWidth, panelHeight);
-
-          // Prompt text
-          ctx.fillStyle = '#ffffff';
-          ctx.font = 'bold 20px ui-monospace, Menlo, Consolas, monospace';
-          ctx.textAlign = 'center';
-          ctx.textBaseline = 'top';
-          ctx.fillText(
-            'Continue to next day?',
-            panelX + panelWidth / 2,
-            panelY + 30
-          );
-
-          // Continue button (green)
-          const buttonWidth = 120;
-          const buttonHeight = 50;
-          const buttonSpacing = 40;
-          const continueButtonX =
-            panelX + panelWidth / 2 - buttonWidth - buttonSpacing / 2;
-          const stayButtonX = panelX + panelWidth / 2 + buttonSpacing / 2;
-          const buttonY = panelY + panelHeight - buttonHeight - 30;
-
-          // Check if mouse is hovering over buttons
-          const hoverContinue =
-            mouseX >= continueButtonX &&
-            mouseX <= continueButtonX + buttonWidth &&
-            mouseY >= buttonY &&
-            mouseY <= buttonY + buttonHeight;
-          const hoverStay =
-            mouseX >= stayButtonX &&
-            mouseX <= stayButtonX + buttonWidth &&
-            mouseY >= buttonY &&
-            mouseY <= buttonY + buttonHeight;
-
-          // Continue button (highlight when hovering)
-          ctx.fillStyle = hoverContinue ? '#69db7c' : '#51cf66'; // Lighter green when hovering
-          ctx.fillRect(continueButtonX, buttonY, buttonWidth, buttonHeight);
-          ctx.strokeStyle = '#ffffff';
-          ctx.lineWidth = hoverContinue ? 3 : 2; // Thicker border when hovering
-          ctx.strokeRect(continueButtonX, buttonY, buttonWidth, buttonHeight);
-          ctx.fillStyle = '#ffffff';
-          ctx.font = 'bold 16px ui-monospace, Menlo, Consolas, monospace';
-          ctx.textAlign = 'center';
-          ctx.textBaseline = 'middle';
-          ctx.fillText(
-            'Continue',
-            continueButtonX + buttonWidth / 2,
-            buttonY + buttonHeight / 2
-          );
-
-          // Stay button (highlight when hovering)
-          ctx.fillStyle = hoverStay ? '#ff8787' : '#ff6b6b'; // Lighter red when hovering
-          ctx.fillRect(stayButtonX, buttonY, buttonWidth, buttonHeight);
-          ctx.strokeStyle = '#ffffff';
-          ctx.lineWidth = hoverStay ? 3 : 2; // Thicker border when hovering
-          ctx.strokeRect(stayButtonX, buttonY, buttonWidth, buttonHeight);
-          ctx.fillStyle = '#ffffff';
-          ctx.font = 'bold 16px ui-monospace, Menlo, Consolas, monospace';
-          ctx.fillText(
-            'Stay',
-            stayButtonX + buttonWidth / 2,
-            buttonY + buttonHeight / 2
-          );
 
           ctx.restore();
         }
 
         function render() {
           ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-          // Check if in museum state
-          if (gameState === 'museum') {
-            // Fill background with black
-            ctx.fillStyle = '#000000';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-            // Draw museum directly (no camera translation - positioned at bottom)
-            drawMuseum();
-            ctx.restore(); // Close the translate from drawMuseum
-
-            // Draw player (need to apply same offset as museum)
-            ctx.save();
-            const museumTileSize = tileSize;
-            const museumWorldWidth = museum.width * museumTileSize;
-            const museumWorldHeight = museum.height * museumTileSize;
-            const offsetX = (canvas.width - museumWorldWidth) / 2;
-            const offsetY = canvas.height - museumWorldHeight;
-            ctx.translate(offsetX, offsetY);
-
-            // Player shadow
-            ctx.fillStyle = 'rgba(0,0,0,0.25)';
-            ctx.beginPath();
-            ctx.ellipse(
-              player.x,
-              player.y + player.height * 0.35,
-              player.width * 0.5,
-              player.height * 0.22,
-              0,
-              0,
-              Math.PI * 2
-            );
-            ctx.fill();
-
-            // Player sprite
-            const isMoving = Math.hypot(player.vx, player.vy) > 0.1;
-            const isMovingUp = player.vy < -0.1;
-            let currentSprite;
-            if (isMovingUp) {
-              if (isMoving) {
-                const walkFrame = Math.floor(walkAnimationFrame) % 2;
-                currentSprite =
-                  walkFrame === 0
-                    ? playerSpriteBackWalk1
-                    : playerSpriteBackWalk2;
-              } else {
-                currentSprite = playerSpriteBack;
-              }
-            } else if (isMoving) {
-              const walkFrame = Math.floor(walkAnimationFrame) % 2;
-              currentSprite =
-                walkFrame === 0 ? playerSpriteWalk1 : playerSpriteWalk2;
-            } else {
-              currentSprite = playerSpriteIdle;
-            }
-
-            if (currentSprite.complete && currentSprite.naturalWidth > 0) {
-              const px = Math.round(player.x - player.width / 2);
-              const py = Math.round(player.y - player.height / 2);
-              ctx.imageSmoothingEnabled = false;
-              ctx.drawImage(currentSprite, px, py, player.width, player.height);
-            }
-
-            ctx.restore();
-
-            // Draw curator (use same offset as player in museum)
-            ctx.save();
-            // Use same offset calculation as player drawing
-            const curatorMuseumTileSize = tileSize;
-            const curatorMuseumWorldWidth =
-              museum.width * curatorMuseumTileSize;
-            const curatorMuseumWorldHeight =
-              museum.height * curatorMuseumTileSize;
-            const curatorMuseumOffsetX =
-              (canvas.width - curatorMuseumWorldWidth) / 2;
-            const curatorMuseumOffsetY =
-              canvas.height - curatorMuseumWorldHeight;
-            ctx.translate(curatorMuseumOffsetX, curatorMuseumOffsetY);
-
-            // Draw curator sprite (same pattern as shopkeeper/oldGuy/candyKid)
-            if (curatorSprite.complete && curatorSprite.naturalWidth > 0) {
-              const spriteWidth = 43; // Match player size
-              const spriteHeight = 43;
-
-              // Curator shadow
-              ctx.fillStyle = 'rgba(0,0,0,0.25)';
-              ctx.beginPath();
-              ctx.ellipse(
-                curator.x,
-                curator.y + spriteHeight * 0.35,
-                spriteWidth * 0.5,
-                spriteHeight * 0.22,
-                0,
-                0,
-                Math.PI * 2
-              );
-              ctx.fill();
-
-              const px = Math.round(curator.x - spriteWidth / 2);
-              const py = Math.round(curator.y - spriteHeight / 2);
-              ctx.imageSmoothingEnabled = false;
-              ctx.drawImage(curatorSprite, px, py, spriteWidth, spriteHeight);
-            } else {
-              // Fallback while loading (same pattern as shopkeeper)
-              ctx.fillStyle = 'rgba(0,0,0,0.25)';
-              ctx.beginPath();
-              ctx.ellipse(
-                curator.x,
-                curator.y + curator.radius * 0.4,
-                curator.radius * 0.6,
-                curator.radius * 0.2,
-                0,
-                0,
-                Math.PI * 2
-              );
-              ctx.fill();
-
-              ctx.fillStyle = '#8b4caf'; // Purple color for curator placeholder
-              ctx.strokeStyle = '#6a3d8c';
-              ctx.lineWidth = 2;
-              ctx.beginPath();
-              ctx.arc(curator.x, curator.y, curator.radius, 0, Math.PI * 2);
-              ctx.fill();
-              ctx.stroke();
-            }
-
-            ctx.restore();
-
-            // Draw door prompt if active
-            if (museum.doorPrompt) {
-              drawMuseumDoorPrompt();
-            }
-
-            // Draw dialogue box if curator (or any NPC) has dialogue
-            if (curator.dialogue) {
-              drawDialogueBox();
-            }
-
-            return; // Don't render normal game elements in museum
-          }
 
           // World space: translate so that camera is centered
           ctx.save();
@@ -4200,12 +2775,6 @@
 
           // Old Guy NPC
           drawOldGuy();
-
-          // Vending Machine
-          drawVendingMachine();
-
-          // Candy Kid NPC
-          drawCandyKid();
 
           // Radar and radar rings
           drawRadar();
@@ -4350,11 +2919,9 @@
           if (!staminaBarGradients) initStaminaGradients();
           const ratio = stamina.current / stamina.max;
           const fillWidth = Math.round(bar.w * ratio);
-          // Make stamina bar red when candybar boost is active
-          ctx.fillStyle =
-            candybarBoost.active || stamina.exhausted
-              ? staminaBarGradients.exhausted
-              : staminaBarGradients.normal;
+          ctx.fillStyle = stamina.exhausted
+            ? staminaBarGradients.exhausted
+            : staminaBarGradients.normal;
           ctx.beginPath();
           ctx.rect(bar.x + 1, bar.y + 1, Math.max(0, fillWidth - 2), bar.h - 2);
           ctx.fill();
@@ -4710,39 +3277,15 @@
             }
 
             // Draw brush sprite - now animated with brushOffset
-            // Check if player has speed brush
-            let hasSpeedBrush = false;
-            if (
-              inventory.equipment &&
-              inventory.equipment.name === 'Speed Brush'
-            ) {
-              hasSpeedBrush = true;
-            }
-            for (let i = 0; i < inventory.slots.length; i++) {
-              if (
-                inventory.slots[i] &&
-                inventory.slots[i].name === 'Speed Brush'
-              ) {
-                hasSpeedBrush = true;
-                break;
-              }
-            }
             const brushSize = 80;
             const brushX = canvas.width / 2 + brushingMinigame.brushOffset; // Add offset for animation
             const brushY = brushingMinigame.brushY;
 
-            // Use speed brush sprite if player has it, otherwise use regular brush
-            const currentBrushSprite = hasSpeedBrush
-              ? speedBrushSprite
-              : brushSprite;
-            if (
-              currentBrushSprite.complete &&
-              currentBrushSprite.naturalWidth > 0
-            ) {
+            if (brushSprite.complete && brushSprite.naturalWidth > 0) {
               ctx.save();
               ctx.imageSmoothingEnabled = false;
               ctx.drawImage(
-                currentBrushSprite,
+                brushSprite,
                 brushX - brushSize / 2,
                 brushY - brushSize / 2,
                 brushSize,
@@ -5114,19 +3657,8 @@
             drawShopMenu();
           }
 
-          // Draw vending machine menu
-          if (vendingMachine.open) {
-            drawVendingMachineMenu();
-          }
-
           // Draw dialogue textbox (RPG style at top of screen)
-          // Only show tutorial on first day (Monday = day 0)
-          if (
-            (tutorial.active && dayTime.currentDay === 0) ||
-            shopkeeper.dialogue ||
-            oldGuy.dialogue ||
-            candyKid.dialogue
-          ) {
+          if (tutorial.active || shopkeeper.dialogue || oldGuy.dialogue) {
             drawDialogueBox();
           }
 
@@ -5315,91 +3847,54 @@
             const itemRectW = shopWidth - 40;
             const itemRectH = itemHeight;
 
-            // Check if item is purchased (for Multipliers tab)
-            const isPurchased = item.purchased === true;
+            // Check if player already owns this item
+            let alreadyOwned = false;
+            if (item.type === 'shovel') {
+              alreadyOwned =
+                inventory.equipment &&
+                inventory.equipment.tier === item.tier &&
+                inventory.equipment.type === 'shovel';
+            } else if (item.type === 'equipment' && item.name === 'Radar') {
+              alreadyOwned = radar.active;
+            }
 
-            // Item background - gray out if purchased
-            ctx.fillStyle = isPurchased
-              ? 'rgba(40, 40, 40, 0.6)'
+            // Item background
+            ctx.fillStyle = alreadyOwned
+              ? 'rgba(15, 30, 20, 0.6)'
               : 'rgba(20, 40, 30, 0.8)';
-            ctx.strokeStyle = isPurchased
-              ? 'rgba(128, 128, 128, 0.6)'
-              : 'rgba(255, 255, 255, 0.6)'; // Gray borders if purchased
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)'; // White borders
             ctx.lineWidth = 2;
             ctx.beginPath();
             ctx.rect(itemRectX, itemRectY, itemRectW, itemRectH);
             ctx.fill();
             ctx.stroke();
 
-            // Draw item sprite (if available)
-            let itemSprite = null;
-            if (item.type === 'shovel') {
-              itemSprite = shovelSprites[item.tier];
-            } else if (item.type === 'equipment' && item.name === 'Radar') {
-              itemSprite = radarSprite;
-            } else if (
-              item.type === 'equipment' &&
-              item.name === 'Speed Brush'
-            ) {
-              itemSprite = speedBrushSprite;
-            }
-
-            // Draw sprite if available (left side of item box)
-            const spriteSize = 32;
-            const spriteX = itemRectX + 10;
-            const spriteY = itemRectY + (itemRectH - spriteSize) / 2;
-            const hasSprite =
-              itemSprite && itemSprite.complete && itemSprite.naturalWidth > 0;
-            if (hasSprite) {
-              ctx.imageSmoothingEnabled = false;
-              ctx.drawImage(
-                itemSprite,
-                spriteX,
-                spriteY,
-                spriteSize,
-                spriteSize
-              );
-            }
-
-            // Item name - gray out if purchased (offset to make room for sprite)
-            const nameX = itemRectX + (hasSprite ? 50 : 10);
-            ctx.fillStyle = isPurchased ? '#888888' : '#ffffff';
+            // Item name
+            ctx.fillStyle = '#ffffff';
             ctx.font = 'bold 14px ui-monospace, Menlo, Consolas, monospace';
             ctx.textAlign = 'left';
             ctx.textBaseline = 'top';
-            ctx.fillText(item.name, nameX, itemRectY + 6);
+            ctx.fillText(item.name, itemRectX + 10, itemRectY + 6);
 
             // Item tier (only for shovels)
             if (item.type === 'shovel') {
-              ctx.fillStyle = isPurchased ? '#888888' : '#ffffff';
+              ctx.fillStyle = '#ffffff';
               ctx.font = '11px ui-monospace, Menlo, Consolas, monospace';
-              ctx.fillText(`Tier ${item.tier}`, nameX, itemRectY + 22);
+              ctx.fillText(`Tier ${item.tier}`, itemRectX + 10, itemRectY + 22);
             }
 
-            if (isPurchased) {
-              // Show "Purchased" for purchased items
-              ctx.fillStyle = '#888888';
+            if (alreadyOwned) {
+              // Show "Sold" for already owned items
+              ctx.fillStyle = '#ffffff';
               ctx.font = 'bold 16px ui-monospace, Menlo, Consolas, monospace';
               ctx.textAlign = 'right';
               ctx.textBaseline = 'middle';
               ctx.fillText(
-                'PURCHASED',
+                'SOLD',
                 itemRectX + itemRectW - 10,
                 itemRectY + itemRectH / 2
               );
             } else {
-              // Check if previous tier is purchased (for Multipliers tab)
-              let canBuy = true;
-              if (item.type === 'shovel' && item.tier > 1) {
-                // Find previous tier item
-                const prevTierItem = shop.items.find(
-                  (i) => i.type === 'shovel' && i.tier === item.tier - 1
-                );
-                if (prevTierItem && !prevTierItem.purchased) {
-                  canBuy = false;
-                }
-              }
-
               // Price
               const priceText = `$${item.price}`;
               const canAfford = money.amount >= item.price;
@@ -5413,16 +3908,7 @@
               );
 
               // Buy button indicator (click to buy)
-              if (!canBuy) {
-                ctx.fillStyle = '#ff6666';
-                ctx.font = '11px ui-monospace, Menlo, Consolas, monospace';
-                ctx.textAlign = 'right';
-                ctx.fillText(
-                  'Buy previous tier first',
-                  itemRectX + itemRectW - 10,
-                  itemRectY + 32
-                );
-              } else if (canAfford) {
+              if (canAfford) {
                 ctx.fillStyle = '#ffffff';
                 ctx.font = '11px ui-monospace, Menlo, Consolas, monospace';
                 ctx.textAlign = 'right';
@@ -5432,7 +3918,7 @@
                   itemRectY + 32
                 );
               } else {
-                ctx.fillStyle = '#ff6666'; // Red for cannot afford
+                ctx.fillStyle = '#ffffff';
                 ctx.font = '11px ui-monospace, Menlo, Consolas, monospace';
                 ctx.textAlign = 'right';
                 ctx.fillText(
@@ -5458,199 +3944,34 @@
           ctx.restore();
         }
 
-        function drawVendingMachineMenu() {
-          ctx.save();
-
-          const shopWidth = 400;
-          const itemHeight = 50;
-          const titleHeight = 40;
-          const instructionsHeight = 25;
-          const topPadding = 15;
-          const bottomPadding = 15;
-          const shopHeight =
-            titleHeight +
-            topPadding +
-            itemHeight +
-            bottomPadding +
-            instructionsHeight;
-          const shopX = Math.round(canvas.width / 2 - shopWidth / 2) + 0.5;
-          const shopY = Math.round(canvas.height / 2 - shopHeight / 2) + 0.5;
-
-          // Background overlay
-          ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-          ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-          // Shop panel background
-          ctx.fillStyle = 'rgba(8, 16, 12, 0.95)';
-          ctx.beginPath();
-          ctx.rect(shopX, shopY, shopWidth, shopHeight);
-          ctx.fill();
-
-          // Shop panel border
-          ctx.strokeStyle = '#ffffff';
-          ctx.lineWidth = 3;
-          ctx.strokeRect(shopX, shopY, shopWidth, shopHeight);
-
-          // Title
-          ctx.fillStyle = '#ffffff';
-          ctx.font = 'bold 20px ui-monospace, Menlo, Consolas, monospace';
-          ctx.textAlign = 'center';
-          ctx.textBaseline = 'top';
-          ctx.fillText('Vending Machine', shopX + shopWidth / 2, shopY + 12);
-
-          // Draw candybar item
-          const itemY = shopY + titleHeight + topPadding;
-          const itemRectX = shopX + 20;
-          const itemRectY = itemY;
-          const itemRectW = shopWidth - 40;
-          const itemRectH = itemHeight;
-
-          // Item background
-          ctx.fillStyle = 'rgba(20, 40, 30, 0.8)';
-          ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
-          ctx.lineWidth = 2;
-          ctx.beginPath();
-          ctx.rect(itemRectX, itemRectY, itemRectW, itemRectH);
-          ctx.fill();
-          ctx.stroke();
-
-          // Item name
-          ctx.fillStyle = '#ffffff';
-          ctx.font = 'bold 14px ui-monospace, Menlo, Consolas, monospace';
-          ctx.textAlign = 'left';
-          ctx.textBaseline = 'top';
-          ctx.fillText('Candybar', itemRectX + 10, itemRectY + 6);
-
-          // Price (increases by $25 each purchase)
-          const priceText = `$${vendingMachine.candyBarPrice}`;
-          const canAfford = money.amount >= vendingMachine.candyBarPrice;
-          ctx.fillStyle = '#ffffff';
-          ctx.font = 'bold 14px ui-monospace, Menlo, Consolas, monospace';
-          ctx.textAlign = 'right';
-          ctx.fillText(priceText, itemRectX + itemRectW - 10, itemRectY + 14);
-
-          // Buy button indicator
-          if (canAfford) {
-            ctx.fillStyle = '#ffffff';
-            ctx.font = '11px ui-monospace, Menlo, Consolas, monospace';
-            ctx.textAlign = 'right';
-            ctx.fillText(
-              'Click to buy',
-              itemRectX + itemRectW - 10,
-              itemRectY + 32
-            );
-          } else {
-            ctx.fillStyle = '#ff6666'; // Red for cannot afford
-            ctx.font = '11px ui-monospace, Menlo, Consolas, monospace';
-            ctx.textAlign = 'right';
-            ctx.fillText(
-              'Cannot afford',
-              itemRectX + itemRectW - 10,
-              itemRectY + 32
-            );
-          }
-
-          // Instructions
-          ctx.fillStyle = '#ffffff';
-          ctx.font = '11px ui-monospace, Menlo, Consolas, monospace';
-          ctx.textAlign = 'center';
-          ctx.textBaseline = 'bottom';
-          ctx.fillText(
-            'Press Spacebar to close | Click item to purchase',
-            shopX + shopWidth / 2,
-            shopY + shopHeight - 10
-          );
-
-          ctx.restore();
-        }
-
-        function purchaseVendingMachineItem() {
-          // Check if player can afford candybar
-          if (money.amount >= vendingMachine.candyBarPrice) {
-            // Find empty inventory slot
-            let slotIndex = -1;
-            for (let i = 0; i < inventory.slots.length; i++) {
-              if (inventory.slots[i] === null) {
-                slotIndex = i;
-                break;
-              }
-            }
-
-            // If inventory is full, can't buy
-            if (slotIndex === -1) {
-              return; // Inventory full
-            }
-
-            // Deduct money and increase price
-            money.amount -= vendingMachine.candyBarPrice;
-            vendingMachine.candyBarPrice += 25;
-
-            // Add candybar to inventory
-            inventory.slots[slotIndex] = {
-              name: 'Candybar',
-              type: 'consumable',
-              sprite: chocolateBarSprite,
-            };
-          }
-        }
-
         function purchaseItem(itemIndex) {
           if (itemIndex < 0 || itemIndex >= shop.items.length) return;
 
           const item = shop.items[itemIndex];
 
           if (item.type === 'shovel') {
-            // Check if already purchased
-            if (item.purchased) {
-              return; // Already purchased
-            }
-
-            // Check if previous tier is purchased (for tier > 1)
-            if (item.tier > 1) {
-              const prevTierItem = shop.items.find(
-                (i) => i.type === 'shovel' && i.tier === item.tier - 1
-              );
-              if (prevTierItem && !prevTierItem.purchased) {
-                return; // Must buy previous tier first
-              }
+            // Check if player already owns a shovel of this tier
+            if (inventory.equipment && inventory.equipment.tier === item.tier) {
+              return; // Already own this type of shovel
             }
 
             if (money.amount >= item.price) {
               money.amount -= item.price;
-              // Mark as purchased
-              item.purchased = true;
-
-              // Check if this is the first item purchased
-              if (!shopkeeper.hasBoughtFirstItem) {
-                shopkeeper.hasBoughtFirstItem = true;
-                // Set dialogue to show inventory message
-                shopkeeper.dialogue =
-                  "Press E to open your inventory to see the items you've bought!";
-                shopkeeper.dialogueStage = 1;
-                shopkeeper.dialogueTimer = 0;
-              }
-
               // Get the appropriate sprite for this shovel tier
-              // For tier 6 (Purple X Shovel), use the regular shovel sprite as placeholder
               let sprite = shovelSprites[item.tier];
-              // If sprite not loaded yet, try to load it, or use a default
+              // If sprite not loaded yet, load it now
               if (!sprite) {
-                if (item.tier === 6) {
-                  // Use tier 5 sprite as placeholder for tier 6
-                  sprite = shovelSprites[5] || shovelSprites[1];
-                } else {
-                  const spriteName =
-                    'assets/sprites/' +
-                    item.name.toLowerCase().replace(/\s+/g, '-') +
-                    '.png';
-                  sprite = loadShovelSprite(item.tier, spriteName);
-                }
+                const spriteName =
+                  'assets/sprites/' +
+                  item.name.toLowerCase().replace(/\s+/g, '-') +
+                  '.png';
+                sprite = loadShovelSprite(item.tier, spriteName);
               }
-              // Add shovel to equipment slot (use highest tier purchased)
+              // Add shovel to equipment slot
               inventory.equipment = {
                 name: item.name,
                 tier: item.tier,
-                sprite: sprite || shovelSprites[1], // Fallback to tier 1 sprite
+                sprite: sprite,
                 type: 'shovel',
               };
             }
@@ -5662,17 +3983,6 @@
 
             if (money.amount >= item.price) {
               money.amount -= item.price;
-
-              // Check if this is the first item purchased
-              if (!shopkeeper.hasBoughtFirstItem) {
-                shopkeeper.hasBoughtFirstItem = true;
-                // Set dialogue to show inventory message
-                shopkeeper.dialogue =
-                  "Press E to open your inventory to see the items you've bought!";
-                shopkeeper.dialogueStage = 1;
-                shopkeeper.dialogueTimer = 0;
-              }
-
               // Activate radar
               radar.active = true;
               radar.ringTimer = 0;
@@ -5713,52 +4023,14 @@
           ctx.textAlign = 'left';
           ctx.textBaseline = 'top';
 
-          // Determine which character is speaking and get their name
-          let characterName = '';
-          if (tutorial.active) {
-            characterName = 'Candy Kid';
-          } else if (shopkeeper.dialogue) {
-            characterName = 'Chase';
-          } else if (oldGuy.dialogue) {
-            characterName = 'Uncle Bernie';
-          } else if (candyKid.dialogue) {
-            characterName = 'Candy Kid';
-          } else if (curator.dialogue) {
-            characterName = 'Museum Curator';
-          }
-
-          // Draw character name above dialogue text
-          let nameY = boxY + boxPadding;
-          if (characterName) {
-            ctx.fillStyle = '#ffffff'; // White for character names
-            ctx.font = 'bold 14px ui-monospace, Menlo, Consolas, monospace';
-            ctx.textAlign = 'left';
-            ctx.textBaseline = 'top';
-            ctx.fillText(characterName, boxX + boxPadding, nameY);
-
-            // Draw line between name and text
-            const lineY = nameY + 18;
-            ctx.strokeStyle = '#ffffff';
-            ctx.lineWidth = 1;
-            ctx.beginPath();
-            ctx.moveTo(boxX + boxPadding, lineY);
-            ctx.lineTo(boxX + boxWidth - boxPadding, lineY);
-            ctx.stroke();
-          }
-
           // Word wrap the dialogue text
           const maxWidth = boxWidth - boxPadding * 2;
           const dialogueText = tutorial.active
             ? tutorial.dialogue
-            : shopkeeper.dialogue ||
-              oldGuy.dialogue ||
-              candyKid.dialogue ||
-              curator.dialogue ||
-              '';
+            : shopkeeper.dialogue || oldGuy.dialogue || '';
           const words = dialogueText.split(' ');
           let line = '';
-          // Start text below character name and line (add extra space if name exists)
-          let y = boxY + boxPadding + (characterName ? 38 : 0);
+          let y = boxY + boxPadding;
 
           for (let i = 0; i < words.length; i++) {
             const testLine = line + words[i] + ' ';
@@ -5793,48 +4065,24 @@
         function drawInventory() {
           ctx.save();
 
-          // Equipment items that can be owned
-          const equipmentItems = [
-            {
-              name: 'Radar',
-              sprite: radarSprite,
-              description: "Reveals hidden X's",
-            },
-            {
-              name: 'Chocolate Bar',
-              sprite: chocolateBarSprite,
-              description: 'Speeds up your movement',
-            },
-            {
-              name: 'Speed Brush',
-              sprite: speedBrushSprite,
-              description: 'Makes brushing minigame easier',
-            },
-          ];
-
           // Artifacts panel dimensions
           const slotSize = 48;
           const slotSpacing = 4;
           const slotsPerRow = 5;
-          const numRows = 2; // Reduced from 3 to make room for equipment row
+          const numRows = 3;
           const panelPadding = 24;
-          const equipmentSlotSize = 48;
-          const equipmentRowSpacing = 4;
+          const equipmentSlotSize = 64;
           const titleHeight = 40;
           const equipmentLabelHeight = 16;
-          const equipmentSpacing = 30; // Increased spacing between equipment and artifacts
+          const equipmentSpacing = 20;
           const instructionsHeight = 30;
 
           // Calculate proper dimensions to fit all slots
-          const equipmentRowWidth =
-            equipmentItems.length * equipmentSlotSize +
-            (equipmentItems.length - 1) * equipmentRowSpacing;
           const slotsAreaWidth =
             slotsPerRow * slotSize + (slotsPerRow - 1) * slotSpacing;
           const slotsAreaHeight =
             numRows * slotSize + (numRows - 1) * slotSpacing;
-          const inventoryWidth =
-            Math.max(equipmentRowWidth, slotsAreaWidth) + panelPadding * 2;
+          const inventoryWidth = slotsAreaWidth + panelPadding * 2;
           const inventoryHeight =
             titleHeight +
             equipmentSlotSize +
@@ -5869,120 +4117,58 @@
           ctx.font = 'bold 20px ui-monospace, Menlo, Consolas, monospace';
           ctx.textAlign = 'center';
           ctx.textBaseline = 'top';
-          ctx.fillText('Inventory', panelX + inventoryWidth / 2, panelY + 12);
+          ctx.fillText('Tools', panelX + inventoryWidth / 2, panelY + 12);
 
-          // Equipment row (at the top, centered)
-          const equipmentRowStartX =
-            panelX + inventoryWidth / 2 - equipmentRowWidth / 2;
+          // Equipment slot (at the top, centered)
+          const equipmentX =
+            panelX + inventoryWidth / 2 - equipmentSlotSize / 2;
           const equipmentY = panelY + titleHeight;
-
-          // Equipment label (above the equipment row)
-          ctx.fillStyle = '#ffffff';
-          ctx.font = '11px ui-monospace, Menlo, Consolas, monospace';
-          ctx.textAlign = 'center';
-          ctx.textBaseline = 'bottom';
-          ctx.fillText(
-            'Equipment',
-            panelX + inventoryWidth / 2,
-            equipmentY - 4
+          ctx.fillStyle = 'rgba(20, 40, 30, 0.8)';
+          ctx.strokeStyle = 'rgba(255, 255, 255, 0.7)'; // White with slight transparency
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.rect(
+            equipmentX,
+            equipmentY,
+            equipmentSlotSize,
+            equipmentSlotSize
           );
+          ctx.fill();
+          ctx.stroke();
 
-          let hoveredItemDescription = null;
-
-          // Draw equipment items row
-          for (let i = 0; i < equipmentItems.length; i++) {
-            const item = equipmentItems[i];
-            const equipmentX =
-              equipmentRowStartX +
-              i * (equipmentSlotSize + equipmentRowSpacing);
-
-            // Check if player owns this item
-            let isOwned = false;
-            if (item.name === 'Radar') {
-              isOwned = radar.active;
-            } else if (item.name === 'Chocolate Bar') {
-              // Check if player has chocolate bar in inventory
-              isOwned = inventory.slots.some(
-                (slot) => slot && slot.name === 'Candybar'
-              );
-            } else if (item.name === 'Speed Brush') {
-              // Check if player has speed brush in inventory
-              isOwned = inventory.slots.some(
-                (slot) => slot && slot.name === 'Speed Brush'
-              );
-            }
-
-            // Check if hovering (only show description if owned)
-            const isHovered =
-              mouseX >= equipmentX &&
-              mouseX <= equipmentX + equipmentSlotSize &&
-              mouseY >= equipmentY &&
-              mouseY <= equipmentY + equipmentSlotSize;
-
-            if (isHovered && isOwned) {
-              hoveredItemDescription = item.description;
-            }
-
-            // Slot background
-            ctx.fillStyle = isOwned
-              ? 'rgba(20, 40, 30, 0.8)'
-              : 'rgba(0, 0, 0, 0.9)'; // Black if not owned
-            ctx.strokeStyle = isOwned
-              ? 'rgba(255, 255, 255, 0.9)'
-              : 'rgba(255, 255, 255, 0.2)';
-            ctx.lineWidth = isOwned ? 2 : 1.5;
-            ctx.beginPath();
-            ctx.rect(
-              equipmentX,
-              equipmentY,
-              equipmentSlotSize,
-              equipmentSlotSize
-            );
-            ctx.fill();
-            ctx.stroke();
-
-            // Draw item sprite (only if owned, otherwise slot is black)
-            if (
-              isOwned &&
-              item.sprite &&
-              item.sprite.complete &&
-              item.sprite.naturalWidth > 0
-            ) {
-              const spriteSize = equipmentSlotSize - 8;
+          // Draw equipment sprite if equipped
+          if (inventory.equipment && inventory.equipment.sprite) {
+            const sprite = inventory.equipment.sprite;
+            // Only draw if image is loaded
+            if (sprite.complete && sprite.naturalWidth > 0) {
+              const spriteSize = equipmentSlotSize - 8; // Leave some padding
               const spriteX = equipmentX + (equipmentSlotSize - spriteSize) / 2;
               const spriteY = equipmentY + (equipmentSlotSize - spriteSize) / 2;
               ctx.save();
-              ctx.imageSmoothingEnabled = false;
-              ctx.drawImage(
-                item.sprite,
-                spriteX,
-                spriteY,
-                spriteSize,
-                spriteSize
-              );
+              ctx.imageSmoothingEnabled = false; // Pixelated rendering
+              ctx.drawImage(sprite, spriteX, spriteY, spriteSize, spriteSize);
               ctx.restore();
             }
           }
 
-          // Artifacts label
-          const artifactsLabelY =
+          // Equipment label (below the equipment slot)
+          ctx.fillStyle = '#ffffff';
+          ctx.font = '11px ui-monospace, Menlo, Consolas, monospace';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'top';
+          ctx.fillText(
+            'Equipment',
+            equipmentX + equipmentSlotSize / 2,
+            equipmentY + equipmentSlotSize + 4
+          );
+
+          // Artifact slots grid (below equipment label)
+          const slotsStartX = panelX + panelPadding;
+          const slotsStartY =
             equipmentY +
             equipmentSlotSize +
             equipmentLabelHeight +
             equipmentSpacing;
-          ctx.fillStyle = '#ffffff';
-          ctx.font = '11px ui-monospace, Menlo, Consolas, monospace';
-          ctx.textAlign = 'center';
-          ctx.textBaseline = 'bottom';
-          ctx.fillText(
-            'Artifacts',
-            panelX + inventoryWidth / 2,
-            artifactsLabelY - 4
-          );
-
-          // Artifact slots grid (below equipment row)
-          const slotsStartX = panelX + panelPadding;
-          const slotsStartY = artifactsLabelY;
 
           for (let row = 0; row < numRows; row++) {
             for (let col = 0; col < slotsPerRow; col++) {
@@ -5999,100 +4185,11 @@
               ctx.fill();
               ctx.stroke();
 
-              // Check if hovering over this slot
-              const isHovered =
-                mouseX >= slotX &&
-                mouseX <= slotX + slotSize &&
-                mouseY >= slotY &&
-                mouseY <= slotY + slotSize;
-
-              // Draw item if present
-              const item = inventory.slots[slotIndex];
-              if (item) {
-                // Draw item sprite
-                if (
-                  item.sprite &&
-                  item.sprite.complete &&
-                  item.sprite.naturalWidth > 0
-                ) {
-                  const spriteSize = slotSize - 8; // Leave padding
-                  const spriteX = slotX + (slotSize - spriteSize) / 2;
-                  const spriteY = slotY + (slotSize - spriteSize) / 2;
-                  ctx.save();
-                  ctx.imageSmoothingEnabled = false;
-                  ctx.drawImage(
-                    item.sprite,
-                    spriteX,
-                    spriteY,
-                    spriteSize,
-                    spriteSize
-                  );
-                  ctx.restore();
-                }
-
-                // Show description on hover
-                if (isHovered) {
-                  let description = '';
-                  if (item.name === 'Candybar') {
-                    description = 'Speeds up your movement';
-                  } else if (item.name === 'Speed Brush') {
-                    description = 'Makes brushing minigame easier';
-                  } else {
-                    description = item.name;
-                  }
-                  if (!hoveredItemDescription) {
-                    hoveredItemDescription = description;
-                  }
-                }
+              // Draw item if present (currently all slots are empty)
+              if (inventory.slots[slotIndex]) {
+                // Item rendering would go here when items are added
               }
             }
-          }
-
-          // Draw hover tooltip
-          if (hoveredItemDescription) {
-            const tooltipPadding = 8;
-            const tooltipX = mouseX + 10;
-            const tooltipY = mouseY + 10;
-
-            ctx.fillStyle = 'rgba(0, 0, 0, 0.9)';
-            ctx.font = '12px ui-monospace, Menlo, Consolas, monospace';
-            ctx.textAlign = 'left';
-            ctx.textBaseline = 'top';
-            const metrics = ctx.measureText(hoveredItemDescription);
-            const tooltipWidth = metrics.width + tooltipPadding * 2;
-            const tooltipHeight = 20;
-
-            // Make sure tooltip stays on screen
-            const finalTooltipX =
-              tooltipX + tooltipWidth > canvas.width
-                ? mouseX - tooltipWidth - 10
-                : tooltipX;
-            const finalTooltipY =
-              tooltipY + tooltipHeight > canvas.height
-                ? mouseY - tooltipHeight - 10
-                : tooltipY;
-
-            ctx.fillRect(
-              finalTooltipX,
-              finalTooltipY,
-              tooltipWidth,
-              tooltipHeight
-            );
-            ctx.strokeStyle = '#ffffff';
-            ctx.lineWidth = 1;
-            ctx.strokeRect(
-              finalTooltipX,
-              finalTooltipY,
-              tooltipWidth,
-              tooltipHeight
-            );
-
-            ctx.fillStyle = '#ffffff';
-            ctx.fillText(
-              hoveredItemDescription,
-              finalTooltipX + tooltipPadding,
-              finalTooltipY + 4
-            );
           }
 
           // Instructions
@@ -6113,43 +4210,8 @@
         function drawTitleScreen() {
           ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-          // Save current camera position
-          const savedCameraX = camera.x;
-          const savedCameraY = camera.y;
-
-          // Calculate smooth circular camera position
-          const camX =
-            titleScreenCamera.centerX +
-            Math.cos(titleScreenCamera.angle) * titleScreenCamera.radiusX;
-          const camY =
-            titleScreenCamera.centerY +
-            Math.sin(titleScreenCamera.angle) * titleScreenCamera.radiusY;
-
-          // Set camera to title screen camera position for background rendering
-          camera.x = camX;
-          camera.y = camY;
-
-          // Draw game world background (tiles, grid, flora) - no NPCs, player, or radar
-          ctx.save();
-          // World space: translate so that camera is centered
-          ctx.translate(
-            Math.round(canvas.width / 2 - camera.x),
-            Math.round(canvas.height / 2 - camera.y)
-          );
-
-          // Draw background elements only
-          drawTiles();
-          drawGrid();
-          drawFlora();
-
-          ctx.restore();
-
-          // Restore camera position
-          camera.x = savedCameraX;
-          camera.y = savedCameraY;
-
-          // Draw semi-transparent overlay to darken background slightly and make text readable
-          ctx.fillStyle = 'rgba(15, 26, 18, 0.6)'; // Dark green overlay with transparency
+          // Background
+          ctx.fillStyle = '#0f1a12';
           ctx.fillRect(0, 0, canvas.width, canvas.height);
 
           // Title text
@@ -6216,17 +4278,6 @@
           ctx.fillStyle = '#e8eaf6';
           ctx.font = '24px ui-monospace, Menlo, Consolas, monospace';
           ctx.fillText('PLAY', buttonX, buttonY);
-
-          // Credits text
-          ctx.fillStyle = '#a0a0a0'; // Lighter gray for credits
-          ctx.font = '12px ui-monospace, Menlo, Consolas, monospace';
-          ctx.textAlign = 'center';
-          ctx.textBaseline = 'bottom';
-          ctx.fillText(
-            'Made by the FLL team "Potential Error", with the help of Bernie Durfee.',
-            canvas.width / 2,
-            canvas.height - 20
-          );
         }
 
         // Handle mouse clicks for title screen
@@ -6252,10 +4303,10 @@
               y <= buttonY + buttonHeight / 2
             ) {
               // Initialize day/time system for new game
-              dayTime.currentDay = 0; // Start on Monday
-              dayTime.currentHour = 8; // Start at 8:00 AM
+              dayTime.currentDay = 0;
+              dayTime.currentHour = 8;
               dayTime.currentMinute = 0;
-              dayTime.timeInSeconds = 0; // Start at beginning of day
+              dayTime.timeInSeconds = 0;
               dayTime.totalMoney = 0;
               money.amount = 0;
 
@@ -6277,51 +4328,14 @@
 
         let lastTime = performance.now();
         function loop(now) {
-          try {
-            const dt = Math.min(33, now - lastTime);
-            lastTime = now;
-            const dtSeconds = dt / 1000;
+          const dt = Math.min(33, now - lastTime);
+          lastTime = now;
 
-            if (gameState === 'loading') {
-              // Draw loading screen first to ensure it shows
-              drawLoadingScreen();
-
-              // Update loading progress
-              updateLoadingProgress();
-
-              // Wait for all sprites to load, then wait 1 second more
-              if (loadingState.allLoaded) {
-                loadingState.postLoadTimer += dtSeconds * 1000; // Convert to ms
-                if (loadingState.postLoadTimer >= loadingState.postLoadDelay) {
-                  gameState = 'title';
-                }
-              }
-            } else if (gameState === 'title') {
-              // Update title screen camera for smooth circular scrolling
-              titleScreenCamera.angle += titleScreenCamera.speed * dtSeconds;
-              // Keep angle in reasonable range to prevent overflow
-              if (titleScreenCamera.angle > Math.PI * 2) {
-                titleScreenCamera.angle -= Math.PI * 2;
-              }
-              drawTitleScreen();
-            } else {
-              update(dt);
-              render();
-            }
-          } catch (error) {
-            console.error('Game loop error:', error);
-            // Draw error screen
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            ctx.fillStyle = '#000000';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-            ctx.fillStyle = '#ff0000';
-            ctx.font = '16px monospace';
-            ctx.textAlign = 'center';
-            ctx.fillText(
-              'Error: ' + error.message,
-              canvas.width / 2,
-              canvas.height / 2
-            );
+          if (gameState === 'title') {
+            drawTitleScreen();
+          } else {
+            update(dt);
+            render();
           }
 
           requestAnimationFrame(loop);
