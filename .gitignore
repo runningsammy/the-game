@@ -47,8 +47,18 @@ notes/
 # Browser automation temp files
 .playwright-mcp/
 
+# Build artifacts and dependencies
+node_modules/
+dist/
+*.exe
+package.json
+package-lock.json
+main.js
+preload.js
+
 # Other files not needed for the game
 CoolPotentialError.html
 wowitworks.html
 Downloads/
+Success
 

@@ -421,9 +421,10 @@
         speedBrushSprite.imageSmoothingEnabled = false;
         speedBrushSprite.src = 'assets/sprites/Speed_Brush.png';
 
-        const candyKidSprite = new Image();
-        candyKidSprite.imageSmoothingEnabled = false;
-        candyKidSprite.src = 'assets/sprites/Candy_Kid.png';
+        // Candy Kid sprite (kept for potential future use)
+        // const candyKidSprite = new Image();
+        // candyKidSprite.imageSmoothingEnabled = false;
+        // candyKidSprite.src = 'assets/sprites/Candy_Kid.png';
 
         const dirtSprite = new Image();
         dirtSprite.imageSmoothingEnabled = false;
@@ -471,6 +472,11 @@
 
           // Use requestAnimationFrame to defer to next frame, allowing page to be interactive
           requestAnimationFrame(() => {
+            // Check if tileMap exists (it's created later in the code)
+            if (typeof tileMap === 'undefined') {
+              return; // tileMap not created yet, skip regeneration
+            }
+
             // Only regenerate tiles that use sprites (grass, flowers, and tiles with grass base)
             const spriteTileNames = [
               'grass',
@@ -555,13 +561,18 @@
         oldGuySprite.imageSmoothingEnabled = false;
         oldGuySprite.src = 'assets/sprites/oldguy.png';
 
+        const shopkeeperSprite = new Image();
+        shopkeeperSprite.imageSmoothingEnabled = false;
+        shopkeeperSprite.src = 'assets/sprites/shopkeeper.png';
+
         const curatorSprite = new Image();
         curatorSprite.imageSmoothingEnabled = false;
         curatorSprite.src = 'assets/sprites/Museum_Curator.png';
 
-        const vendingMachineSprite = new Image();
-        vendingMachineSprite.imageSmoothingEnabled = false;
-        vendingMachineSprite.src = 'assets/sprites/Vending_Machine.png';
+        // Vending Machine sprite (kept for potential future use)
+        // const vendingMachineSprite = new Image();
+        // vendingMachineSprite.imageSmoothingEnabled = false;
+        // vendingMachineSprite.src = 'assets/sprites/Vending_Machine.png';
 
         const chocolateBarSprite = new Image();
         chocolateBarSprite.imageSmoothingEnabled = false;
@@ -575,6 +586,10 @@
         const grapeshotSprite = new Image();
         grapeshotSprite.imageSmoothingEnabled = false;
         grapeshotSprite.src = 'assets/sprites/Grapeshot.png';
+
+        const rustyNailsSprite = new Image();
+        rustyNailsSprite.imageSmoothingEnabled = false;
+        rustyNailsSprite.src = 'assets/sprites/Rusty_Nails.png';
 
         // Museum sprites
         const floorTileSprite = new Image();
@@ -822,9 +837,22 @@
               if (grassSprite.complete && grassSprite.naturalWidth > 0) {
                 ctx.drawImage(grassSprite, 0, 0, tileSize, tileSize);
               }
-              // Draw yellow X sprite (visible for testing colors)
-              if (yellowXSprite.complete && yellowXSprite.naturalWidth > 0) {
-                ctx.drawImage(yellowXSprite, 0, 0, tileSize, tileSize);
+              // Draw yellow X sprite only if radar is active
+              // This makes secret X tiles invisible unless player has radar
+              // Check if radar exists and is active (radar is defined later in code)
+              // Use try-catch to safely check radar since it's defined later
+              try {
+                if (
+                  typeof radar !== 'undefined' &&
+                  radar &&
+                  radar.active &&
+                  yellowXSprite.complete &&
+                  yellowXSprite.naturalWidth > 0
+                ) {
+                  ctx.drawImage(yellowXSprite, 0, 0, tileSize, tileSize);
+                }
+              } catch (e) {
+                // Radar not defined yet, don't draw yellow X (tiles will be invisible until radar is active)
               }
             },
           },
@@ -990,23 +1018,14 @@
           hasCompletedIntro: false, // Track if player has completed initial dialogue sequence
         };
 
-        // Vending Machine (positioned to the left of spawn)
-        const vendingMachine = {
-          x: world.width / 2 - 150, // To the left of spawn
-          y: world.height - 40, // Same Y as spawn
-          radius: 35, // Made bigger (was 25)
-          open: false,
-          candyBarPrice: 50, // Starting price
-        };
-
-        // Candy Kid NPC (positioned next to vending machine)
-        const candyKid = {
-          x: world.width / 2 - 250, // To the left of vending machine
-          y: world.height - 40, // Same Y as spawn
+        // Joseph NPC (shopkeeper with radar, positioned centrally)
+        const joseph = {
+          x: world.width / 2, // Central location
+          y: world.height / 2, // Central location
           radius: 20,
           dialogue: null, // Current dialogue text
-          dialogueStage: 0, // 0 = none, 1 = first dialogue, 2 = "Candy..."
-          hasTalkedOnce: false, // Track if player has talked once
+          dialogueStage: 0, // Track dialogue progress (0-5)
+          hasGivenRadar: false, // Track if player has received radar
         };
 
         // Museum Curator NPC (positioned in museum)
@@ -1072,10 +1091,6 @@
               ) {
                 return;
               }
-              // Close vending machine shop if open
-              if (vendingMachine.open) {
-                vendingMachine.open = false;
-              }
               const wasOpen = inventory.open;
               inventory.open = !inventory.open;
               // Kill momentum when opening inventory
@@ -1097,22 +1112,21 @@
               ) {
                 return;
               }
-              // If vending machine shop is open, close it
-              if (vendingMachine.open) {
-                vendingMachine.open = false;
-                player.vx = 0;
-                player.vy = 0;
+              // Only process dialogue/interaction on key press, not while held
+              // This prevents dialogue from skipping too fast when holding spacebar
+              if (!keyJustPressed['Space']) {
+                return; // Key already processed this frame
               }
-              // If dialogue is showing, close it
+              // If dialogue is showing, advance it (only once per key press)
               // Skip tutorial check in museum state (tutorial doesn't apply there)
-              else if (tutorial.active && gameState !== 'museum') {
+              if (tutorial.active && gameState !== 'museum') {
                 tutorial.active = false; // Close tutorial
                 player.vx = 0;
                 player.vy = 0;
               } else if (
                 systemMessage.text ||
                 oldGuy.dialogue ||
-                candyKid.dialogue ||
+                joseph.dialogue ||
                 curator.dialogue
               ) {
                 // System messages can always be closed with spacebar
@@ -1122,8 +1136,8 @@
                   advanceOldGuyDialogue(); // Advance through dialogue stages
                   player.vx = 0;
                   player.vy = 0;
-                } else if (candyKid.dialogue) {
-                  advanceCandyKidDialogue();
+                } else if (joseph.dialogue) {
+                  advanceJosephDialogue();
                   player.vx = 0;
                   player.vy = 0;
                 } else if (curator.dialogue) {
@@ -1314,34 +1328,6 @@
             }
 
             // Close button removed
-          }
-
-          // Vending machine menu click handling
-          if (vendingMachine.open) {
-            const shopWidth = 400;
-            const itemHeight = 50;
-            const titleHeight = 40;
-            const topPadding = 15;
-            const shopHeight = titleHeight + topPadding + itemHeight + 15 + 25;
-            const shopX = Math.round(canvas.width / 2 - shopWidth / 2) + 0.5;
-            const shopY = Math.round(canvas.height / 2 - shopHeight / 2) + 0.5;
-
-            const itemY = shopY + titleHeight + topPadding;
-            const itemRectX = shopX + 20;
-            const itemRectY = itemY;
-            const itemRectW = shopWidth - 40;
-            const itemRectH = itemHeight;
-
-            // Check if clicking on candybar item
-            if (
-              x >= itemRectX &&
-              x <= itemRectX + itemRectW &&
-              y >= itemRectY &&
-              y <= itemRectY + itemRectH
-            ) {
-              purchaseVendingMachineItem();
-              return;
-            }
           }
 
           // Inventory click handling (eating candybars from equipment slot, and inventory slots)
@@ -1776,7 +1762,6 @@
           if (
             gameState === 'playing' &&
             !inventory.open &&
-            !vendingMachine.open &&
             !systemMessage.text &&
             !oldGuy.dialogue &&
             !tutorial.active &&
@@ -1845,8 +1830,8 @@
 
             resolveTreeCollisions();
             resolveOldGuyCollision();
-            resolveCandyKidCollision();
-            resolveVendingMachineCollision();
+            resolveJosephCollision();
+            resolveRadarCollision(); // Radar has collision too
 
             // Update walking animation with speed based on sprinting
             const isMoving = Math.hypot(player.vx, player.vy) > 0.1;
@@ -2106,18 +2091,42 @@
           }
         }
 
-        function resolveCandyKidCollision() {
+        function resolveJosephCollision() {
           const playerRadius = player.radius; // Use cached radius
-          const dx = player.x - candyKid.x;
-          const dy = player.y - candyKid.y;
+          const dx = player.x - joseph.x;
+          const dy = player.y - joseph.y;
           const distSq = dx * dx + dy * dy;
-          const minDist = candyKid.radius + playerRadius;
+          const minDist = joseph.radius + playerRadius;
           const minDistSq = minDist * minDist;
 
           if (distSq < minDistSq && distSq > 0) {
             const dist = Math.sqrt(distSq);
             const overlap = minDist - dist;
             const invDist = 1 / dist; // Cache inverse distance
+            player.x += dx * invDist * overlap;
+            player.y += dy * invDist * overlap;
+          }
+        }
+
+        // Radar collision (radar is positioned next to Joseph)
+        function resolveRadarCollision() {
+          const playerRadius = player.radius;
+          const radarSpriteSize = 43; // Same size as Joseph
+          const radarOffsetX = 50; // Position to the right of Joseph
+          const radarX = joseph.x + radarOffsetX;
+          const radarY = joseph.y;
+          const radarRadius = radarSpriteSize / 2;
+
+          const dx = player.x - radarX;
+          const dy = player.y - radarY;
+          const distSq = dx * dx + dy * dy;
+          const minDist = radarRadius + playerRadius;
+          const minDistSq = minDist * minDist;
+
+          if (distSq < minDistSq && distSq > 0) {
+            const dist = Math.sqrt(distSq);
+            const overlap = minDist - dist;
+            const invDist = 1 / dist;
             player.x += dx * invDist * overlap;
             player.y += dy * invDist * overlap;
           }
@@ -2140,44 +2149,47 @@
           }
         }
 
-        function resolveVendingMachineCollision() {
-          const playerRadius = player.radius; // Use cached radius
-          const dx = player.x - vendingMachine.x;
-          const dy = player.y - vendingMachine.y;
-          const distSq = dx * dx + dy * dy;
-          const minDist = vendingMachine.radius + playerRadius;
-          const minDistSq = minDist * minDist;
-
-          if (distSq < minDistSq && distSq > 0) {
-            const dist = Math.sqrt(distSq);
-            const overlap = minDist - dist;
-            const invDist = 1 / dist; // Cache inverse distance
-            player.x += dx * invDist * overlap;
-            player.y += dy * invDist * overlap;
+        function advanceJosephDialogue() {
+          // Progress through Joseph's dialogue sequence
+          // If already completed dialogue (stage 10), just close
+          if (joseph.dialogueStage >= 10) {
+            joseph.dialogue = null;
+            joseph.dialogueStage = 0;
+            return;
           }
-        }
 
-        function advanceCandyKidDialogue() {
-          if (candyKid.dialogueStage === 1) {
-            // First dialogue sequence
-            if (candyKid.dialogue === 'C- C- Candy...') {
-              candyKid.dialogue =
-                'So hyper... I can do things so much faster than before...';
-            } else if (
-              candyKid.dialogue ===
-              'So hyper... I can do things so much faster than before...'
-            ) {
-              candyKid.dialogue = 'But at what cost...';
-            } else if (candyKid.dialogue === 'But at what cost...') {
-              // Close dialogue after last message
-              candyKid.dialogue = null;
-              candyKid.dialogueStage = 0;
-              candyKid.hasTalkedOnce = true;
+          joseph.dialogueStage++;
+
+          if (joseph.dialogueStage === 1) {
+            joseph.dialogue =
+              'Did you know that radars can detect hidden things underground?';
+          } else if (joseph.dialogueStage === 2) {
+            joseph.dialogue =
+              'This one here is a GPR, or Ground penetrating radar.';
+          } else if (joseph.dialogueStage === 3) {
+            joseph.dialogue =
+              'It works by emitting radiowaves that bounce off objects, approximating their location.';
+          } else if (joseph.dialogueStage === 4) {
+            joseph.dialogue =
+              'Since I dont have much use for this radar, you can have it- for a price.';
+          } else if (joseph.dialogueStage === 5) {
+            joseph.dialogue =
+              'Give me  a artifact using ths radar and you can keep it fo good!';
+          } else if (joseph.dialogueStage >= 6) {
+            // Give radar to player and activate quest
+            if (!joseph.hasGivenRadar) {
+              // Add radar to inventory (equipment slot)
+              inventory.equipment = {
+                name: 'Radar',
+                sprite: radarSprite,
+                tier: 0, // Not a shovel tier
+              };
+              radar.active = true;
+              quests.findArtifactWithRadar.active = true;
+              joseph.hasGivenRadar = true;
             }
-          } else if (candyKid.dialogueStage === 2) {
-            // Second time talking - just "Candy..."
-            candyKid.dialogue = null;
-            candyKid.dialogueStage = 0;
+            joseph.dialogue = null;
+            joseph.dialogueStage = 0;
           }
         }
 
@@ -2242,7 +2254,7 @@
           }
 
           // Don't start new dialogue if one is already showing
-          if (oldGuy.dialogue || candyKid.dialogue || curator.dialogue) {
+          if (oldGuy.dialogue || joseph.dialogue || curator.dialogue) {
             return;
           }
 
@@ -2309,39 +2321,27 @@
             return;
           }
 
-          // Check if player is touching candy kid (collision-based)
-          dx = player.x - candyKid.x;
-          dy = player.y - candyKid.y;
+          // Check if player is touching Joseph (collision-based)
+          // Increase interaction distance to make it easier to talk to Joseph
+          dx = player.x - joseph.x;
+          dy = player.y - joseph.y;
           distSq = dx * dx + dy * dy;
-          minDist = candyKid.radius + playerRadius;
+          minDist = joseph.radius + playerRadius;
           minDistSq = minDist * minDist;
 
-          if (distSq <= minDistSq * 1.2) {
-            // Show candy kid dialogue
-            if (!candyKid.hasTalkedOnce) {
-              candyKid.dialogue = 'C- C- Candy...';
-              candyKid.dialogueStage = 1;
+          // Use larger interaction distance (2.0x instead of 1.2x) to make it easier to interact
+          if (distSq <= minDistSq * 2.0) {
+            // Start Joseph dialogue sequence if not completed
+            if (!joseph.hasGivenRadar) {
+              joseph.dialogueStage = 0;
+              joseph.dialogue =
+                'Did you know that radars can detect hidden things underground?';
             } else {
-              candyKid.dialogue = 'Candy...';
-              candyKid.dialogueStage = 2;
+              // Already gave radar, just acknowledge
+              joseph.dialogue = 'Good luck finding artifacts with that radar!';
+              joseph.dialogueStage = 10; // High number so it closes quickly
             }
-            candyKid.dialogueTimer = 0; // Don't auto-close, wait for Spacebar press
             // Kill momentum when opening dialogue
-            player.vx = 0;
-            player.vy = 0;
-            return;
-          }
-
-          // Check if player is touching vending machine (collision-based)
-          dx = player.x - vendingMachine.x;
-          dy = player.y - vendingMachine.y;
-          distSq = dx * dx + dy * dy;
-          minDist = vendingMachine.radius + playerRadius;
-          minDistSq = minDist * minDist;
-
-          if (distSq <= minDistSq * 1.2) {
-            // Open vending machine shop
-            vendingMachine.open = true;
             player.vx = 0;
             player.vy = 0;
             return;
@@ -2404,6 +2404,16 @@
                 name: itemName,
                 sprite: sprite,
               };
+              // Check if this is an artifact and quest is active
+              if (
+                quests.findArtifactWithRadar.active &&
+                !quests.findArtifactWithRadar.completed &&
+                radar.active
+              ) {
+                // Player found an artifact using the radar - complete quest!
+                quests.findArtifactWithRadar.completed = true;
+                quests.findArtifactWithRadar.active = false; // Quest complete, no longer show
+              }
               return true; // Successfully added
             }
           }
@@ -2411,18 +2421,26 @@
           return false; // Inventory full
         }
 
-        // Function to give minigame reward (randomly chooses bullets or grapeshot)
+        // Function to give minigame reward (randomly chooses artifact)
         function giveMinigameReward() {
-          // Randomly choose between bullets (50%) or grapeshot (50%)
-          const rewardType = Math.random() < 0.5 ? 'bullets' : 'grapeshot';
+          // Randomly choose artifact: Rusty Nails (50%), Bullets (25%), Grapeshot (25%)
+          const roll = Math.random();
 
-          if (rewardType === 'bullets') {
-            // Give bullets if sprite is loaded and inventory has space
+          if (roll < 0.5) {
+            // 50% chance - Rusty Nails
+            if (
+              rustyNailsSprite.complete &&
+              rustyNailsSprite.naturalWidth > 0
+            ) {
+              return addItemToInventory('Rusty Nails', rustyNailsSprite);
+            }
+          } else if (roll < 0.75) {
+            // 25% chance - Bullets
             if (bulletsSprite.complete && bulletsSprite.naturalWidth > 0) {
               return addItemToInventory('Bullets', bulletsSprite);
             }
           } else {
-            // Give grapeshot if sprite is loaded and inventory has space
+            // 25% chance - Grapeshot
             if (grapeshotSprite.complete && grapeshotSprite.naturalWidth > 0) {
               return addItemToInventory('Grapeshot', grapeshotSprite);
             }
@@ -2955,10 +2973,8 @@
 
           declarationMinigame.wasCorrect = isCorrect;
 
-          // Calculate reward/penalty
           let actualReward = 0;
           if (isCorrect) {
-            // Correct answer: +$50 with shovel multiplier and secret X multiplier
             let multiplier = 1.0;
             if (inventory.equipment) {
               if (inventory.equipment.tier === 1)
@@ -2979,14 +2995,11 @@
               declarationMinigame.baseReward * multiplier
             );
           } else if (calledRealFake) {
-            // Called a real document fake: no penalty, no reward (neutral)
             actualReward = 0;
           } else {
-            // Wrong answer (called fake document real): no penalty
             actualReward = 0;
           }
 
-          // Store actual reward for display
           declarationMinigame.actualReward = actualReward;
 
           // Give minigame reward (bullets or grapeshot) when answered correctly
@@ -3030,10 +3043,7 @@
         function updateRadar(dtMs) {
           if (!radar.active) return;
           // Don't fire radar while in any menu
-          if (
-            inventory.open ||
-            (typeof vendingMachine !== 'undefined' && vendingMachine.open)
-          ) {
+          if (inventory.open || false) {
             return;
           }
 
@@ -3201,7 +3211,7 @@
           potPoleSprite,
           brushSprite,
           speedBrushSprite,
-          candyKidSprite,
+          // candyKidSprite, // Removed - NPC not in use
           dirtSprite,
           grassSprite,
           flowerSprite,
@@ -3211,8 +3221,9 @@
           newBushSprite,
           tallGrassSprite,
           oldGuySprite,
+          shopkeeperSprite,
           curatorSprite,
-          vendingMachineSprite,
+          // vendingMachineSprite, // Removed - NPC not in use
           chocolateBarSprite,
           bulletsSprite,
           grapeshotSprite,
@@ -3237,7 +3248,7 @@
 
         // Radar system
         const radar = {
-          active: false, // Whether player owns radar
+          active: false, // Whether player owns radar (equipped in inventory)
           x: 0, // Position (follows behind player)
           y: 0,
           ringTimer: 0, // Timer for next ring
@@ -3245,6 +3256,14 @@
           discoveredSecretX: [], // Array of discovered secret X positions {row, col}
           lastDirection: { x: 0, y: -1 }, // Last movement direction (default: up)
           lastSpriteDirection: 'up', // Last sprite direction: 'up', 'down', 'left', 'right'
+        };
+
+        // Quest system
+        const quests = {
+          findArtifactWithRadar: {
+            active: false, // Whether quest is active
+            completed: false, // Whether quest is completed
+          },
         };
 
         function drawFlora() {
@@ -3321,54 +3340,88 @@
           ctx.restore();
         }
 
-        function drawCandyKid() {
+        function drawJoseph() {
           ctx.save();
 
-          // Draw candy kid sprite
-          if (candyKidSprite.complete && candyKidSprite.naturalWidth > 0) {
-            const spriteWidth = 43; // Match player size
-            const spriteHeight = 43;
+          // Draw Joseph sprite
+          if (shopkeeperSprite.complete && shopkeeperSprite.naturalWidth > 0) {
+            // Use actual sprite dimensions for proper scaling
+            const spriteWidth = shopkeeperSprite.naturalWidth;
+            const spriteHeight = shopkeeperSprite.naturalHeight;
+            const maxDimension = Math.max(spriteWidth, spriteHeight, 1); // Ensure at least 1 to avoid division by zero
+            const scale = 43 / maxDimension; // Scale to match player size (43px)
+            const scaledWidth = spriteWidth * scale;
+            const scaledHeight = spriteHeight * scale;
 
-            // Candy kid shadow
+            // Joseph shadow
             ctx.fillStyle = 'rgba(0,0,0,0.25)';
             ctx.beginPath();
             ctx.ellipse(
-              candyKid.x,
-              candyKid.y + spriteHeight * 0.35,
-              spriteWidth * 0.5,
-              spriteHeight * 0.22,
+              joseph.x,
+              joseph.y + scaledHeight * 0.35,
+              scaledWidth * 0.5,
+              scaledHeight * 0.22,
               0,
               0,
               Math.PI * 2
             );
             ctx.fill();
 
-            const px = Math.round(candyKid.x - spriteWidth / 2);
-            const py = Math.round(candyKid.y - spriteHeight / 2);
+            const px = Math.round(joseph.x - scaledWidth / 2);
+            const py = Math.round(joseph.y - scaledHeight / 2);
             ctx.imageSmoothingEnabled = false;
-            ctx.drawImage(candyKidSprite, px, py, spriteWidth, spriteHeight);
+            ctx.drawImage(shopkeeperSprite, px, py, scaledWidth, scaledHeight);
+
+            // Draw Radar sprite next to Joseph (to the right)
+            // Make radar bigger and add collision
+            if (radarSprite.complete && radarSprite.naturalWidth > 0) {
+              const radarSpriteSize = 43; // Same size as player/Joseph (was 32)
+              const radarOffsetX = 50; // Position to the right of Joseph (increased from 35)
+              const radarX = Math.round(joseph.x + radarOffsetX);
+              const radarY = Math.round(joseph.y - radarSpriteSize / 2);
+
+              // Radar shadow
+              ctx.fillStyle = 'rgba(0,0,0,0.25)';
+              ctx.beginPath();
+              ctx.ellipse(
+                radarX,
+                radarY + radarSpriteSize * 0.35,
+                radarSpriteSize * 0.5,
+                radarSpriteSize * 0.22,
+                0,
+                0,
+                Math.PI * 2
+              );
+              ctx.fill();
+
+              ctx.imageSmoothingEnabled = false;
+              ctx.drawImage(
+                radarSprite,
+                radarX - radarSpriteSize / 2,
+                radarY,
+                radarSpriteSize,
+                radarSpriteSize
+              );
+            }
           } else {
             // Fallback while loading
             ctx.fillStyle = 'rgba(0,0,0,0.25)';
             ctx.beginPath();
             ctx.ellipse(
-              candyKid.x,
-              candyKid.y + candyKid.radius * 0.4,
-              candyKid.radius * 0.6,
-              candyKid.radius * 0.2,
+              joseph.x,
+              joseph.y + joseph.radius * 0.4,
+              joseph.radius * 0.6,
+              joseph.radius * 0.2,
               0,
               0,
               Math.PI * 2
             );
             ctx.fill();
 
-            ctx.fillStyle = '#ff69b4'; // Pink color
-            ctx.strokeStyle = '#ff1493';
-            ctx.lineWidth = 2;
+            ctx.fillStyle = '#8b6f47';
             ctx.beginPath();
-            ctx.arc(candyKid.x, candyKid.y, candyKid.radius, 0, Math.PI * 2);
+            ctx.arc(joseph.x, joseph.y, joseph.radius, 0, Math.PI * 2);
             ctx.fill();
-            ctx.stroke();
           }
 
           ctx.restore();
@@ -3401,74 +3454,6 @@
             const py = Math.round(oldGuy.y - spriteHeight / 2);
             ctx.imageSmoothingEnabled = false;
             ctx.drawImage(oldGuySprite, px, py, spriteWidth, spriteHeight);
-          }
-
-          ctx.restore();
-        }
-
-        function drawVendingMachine() {
-          ctx.save();
-
-          // Draw vending machine sprite
-          if (
-            vendingMachineSprite.complete &&
-            vendingMachineSprite.naturalWidth > 0
-          ) {
-            // Scale bigger than player (50% larger)
-            const spriteWidth = 65; // Bigger (was 43)
-            const spriteHeight = 65; // Bigger (was 43)
-
-            // Vending machine shadow
-            ctx.fillStyle = 'rgba(0,0,0,0.25)';
-            ctx.beginPath();
-            ctx.ellipse(
-              vendingMachine.x,
-              vendingMachine.y + spriteHeight * 0.35,
-              spriteWidth * 0.5,
-              spriteHeight * 0.22,
-              0,
-              0,
-              Math.PI * 2
-            );
-            ctx.fill();
-
-            const px = Math.round(vendingMachine.x - spriteWidth / 2);
-            const py = Math.round(vendingMachine.y - spriteHeight / 2);
-            ctx.imageSmoothingEnabled = false;
-            ctx.drawImage(
-              vendingMachineSprite,
-              px,
-              py,
-              spriteWidth,
-              spriteHeight
-            );
-          } else {
-            // Fallback: draw grey rectangle if sprite didn't load
-            ctx.fillStyle = 'rgba(0,0,0,0.25)';
-            ctx.beginPath();
-            ctx.ellipse(
-              vendingMachine.x,
-              vendingMachine.y + vendingMachine.radius * 0.4,
-              vendingMachine.radius * 0.6,
-              vendingMachine.radius * 0.2,
-              0,
-              0,
-              Math.PI * 2
-            );
-            ctx.fill();
-
-            ctx.fillStyle = '#606060';
-            ctx.strokeStyle = '#808080';
-            ctx.lineWidth = 2;
-            ctx.beginPath();
-            ctx.rect(
-              vendingMachine.x - vendingMachine.radius,
-              vendingMachine.y - vendingMachine.radius,
-              vendingMachine.radius * 2,
-              vendingMachine.radius * 2
-            );
-            ctx.fill();
-            ctx.stroke();
           }
 
           ctx.restore();
@@ -3574,27 +3559,15 @@
               continue;
             }
 
-            // Draw New_X sprite with yellow/orange tint
-            if (newXSprite.complete && newXSprite.naturalWidth > 0) {
-              ctx.save();
-              // Draw the sprite first
+            // Draw yellow X sprite directly (no tinting needed - sprite is already yellow)
+            if (yellowXSprite.complete && yellowXSprite.naturalWidth > 0) {
               ctx.drawImage(
-                newXSprite,
+                yellowXSprite,
                 worldX - tileSize / 2,
                 worldY - tileSize / 2,
                 tileSize,
                 tileSize
               );
-              // Apply yellow/orange tint using multiply
-              ctx.globalCompositeOperation = 'multiply';
-              ctx.fillStyle = '#ffaa00'; // Yellow/orange color
-              ctx.fillRect(
-                worldX - tileSize / 2,
-                worldY - tileSize / 2,
-                tileSize,
-                tileSize
-              );
-              ctx.restore();
             }
           }
 
@@ -3811,6 +3784,10 @@
         function render() {
           ctx.clearRect(0, 0, canvas.width, canvas.height);
 
+          // Fill canvas with world background color to prevent CSS background showing through
+          ctx.fillStyle = world.bg;
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+
           // Check if in museum state
           if (gameState === 'museum') {
             // Fill background with black
@@ -3965,11 +3942,8 @@
           // Old Guy NPC
           drawOldGuy();
 
-          // Vending Machine
-          drawVendingMachine();
-
-          // Candy Kid NPC
-          drawCandyKid();
+          // Joseph NPC (shopkeeper with radar)
+          drawJoseph();
 
           // Radar and radar rings
           drawRadar();
@@ -4094,10 +4068,44 @@
             ctx.restore();
           }
 
-          // UI: Stamina bar (top-left, screen space)
+          // UI: Quest system (top-left, above stamina bar)
+          let questUIHeight = 0;
+          if (
+            quests &&
+            quests.findArtifactWithRadar &&
+            quests.findArtifactWithRadar.active &&
+            !quests.findArtifactWithRadar.completed
+          ) {
+            ctx.save();
+            ctx.font = 'bold 14px ui-monospace, Menlo, Consolas, monospace';
+            ctx.textAlign = 'left';
+            ctx.textBaseline = 'top';
+            ctx.fillStyle = '#ffffff';
+
+            const questX = 16.5;
+            const questY = 14.5;
+
+            // Draw "Quests" label
+            ctx.fillText('Quests', questX, questY);
+
+            // Draw quest description below
+            ctx.font = '12px ui-monospace, Menlo, Consolas, monospace';
+            ctx.fillStyle = '#e8eaf6';
+            ctx.fillText(
+              'Find an artifact using the Radar',
+              questX,
+              questY + 18
+            );
+
+            questUIHeight = 36; // Height of quest UI (18 + 18 spacing)
+            ctx.restore();
+          }
+
+          // UI: Stamina bar (top-left, below quest if visible, otherwise at top)
+          const staminaBarY = 14.5 + questUIHeight;
           const bar = {
             x: 16.5,
-            y: 14.5,
+            y: staminaBarY,
             w: 220,
             h: 16,
           };
@@ -4704,29 +4712,18 @@
                 Math.round(buttonY + buttonHeight / 2)
               );
             } else {
-              // Show result with money gained/lost
               let resultText = '';
               let resultColor = '#ffffff';
 
               if (declarationMinigame.wasCorrect) {
                 resultText = 'Correct!';
-                resultColor = '#00ff00'; // Green
+                resultColor = '#00ff00';
               } else if (declarationMinigame.actualReward === 0) {
                 resultText = 'Incorrect! (No penalty)';
-                resultColor = '#ffff00'; // Yellow for neutral
+                resultColor = '#ffff00';
               } else {
                 resultText = 'Incorrect!';
-                resultColor = '#ff0000'; // Red
-              }
-
-              // Money text
-              let moneyText = '';
-              if (declarationMinigame.actualReward > 0) {
-                moneyText = `+$${declarationMinigame.actualReward}`;
-              } else if (declarationMinigame.actualReward < 0) {
-                moneyText = `$${declarationMinigame.actualReward}`; // Already negative
-              } else {
-                moneyText = '$0';
+                resultColor = '#ff0000';
               }
 
               ctx.fillStyle = resultColor;
@@ -4735,14 +4732,6 @@
                 resultText,
                 Math.round(canvas.width / 2),
                 Math.round(panelY + panelHeight - 60)
-              );
-
-              ctx.fillStyle = '#ffffff';
-              ctx.font = 'bold 24px ui-monospace, Menlo, Consolas, monospace';
-              ctx.fillText(
-                moneyText,
-                Math.round(canvas.width / 2),
-                Math.round(panelY + panelHeight - 30)
               );
             }
 
@@ -4817,11 +4806,6 @@
             drawInventory();
           }
 
-          // Draw vending machine menu
-          if (vendingMachine.open) {
-            drawVendingMachineMenu();
-          }
-
           // Draw dialogue textbox (RPG style at top of screen)
           // Only show tutorial on first day (Monday = day 0)
           // System messages are also shown
@@ -4829,7 +4813,6 @@
             systemMessage.text ||
             (tutorial.active && dayTime.currentDay === 0) ||
             oldGuy.dialogue ||
-            candyKid.dialogue ||
             curator.dialogue
           ) {
             drawDialogueBox();
@@ -4895,8 +4878,6 @@
               canvas.width / 2,
               canvas.height / 2 - 100
             );
-
-            // Money system removed
 
             // Determine ending
             let endingText = '';
@@ -5199,126 +5180,6 @@
           ctx.restore();
         }
 
-        function drawVendingMachineMenu() {
-          ctx.save();
-
-          const shopWidth = 400;
-          const itemHeight = 50;
-          const titleHeight = 40;
-          const instructionsHeight = 25;
-          const topPadding = 15;
-          const bottomPadding = 15;
-          const shopHeight =
-            titleHeight +
-            topPadding +
-            itemHeight +
-            bottomPadding +
-            instructionsHeight;
-          const shopX = Math.round(canvas.width / 2 - shopWidth / 2) + 0.5;
-          const shopY = Math.round(canvas.height / 2 - shopHeight / 2) + 0.5;
-
-          // Background overlay
-          ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-          ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-          // Shop panel background
-          ctx.fillStyle = 'rgba(8, 16, 12, 0.95)';
-          ctx.beginPath();
-          ctx.rect(shopX, shopY, shopWidth, shopHeight);
-          ctx.fill();
-
-          // Shop panel border
-          ctx.strokeStyle = '#ffffff';
-          ctx.lineWidth = 3;
-          ctx.strokeRect(shopX, shopY, shopWidth, shopHeight);
-
-          // Title
-          ctx.fillStyle = '#ffffff';
-          ctx.font = 'bold 20px ui-monospace, Menlo, Consolas, monospace';
-          ctx.textAlign = 'center';
-          ctx.textBaseline = 'top';
-          ctx.fillText('Vending Machine', shopX + shopWidth / 2, shopY + 12);
-
-          // Draw candybar item
-          const itemY = shopY + titleHeight + topPadding;
-          const itemRectX = shopX + 20;
-          const itemRectY = itemY;
-          const itemRectW = shopWidth - 40;
-          const itemRectH = itemHeight;
-
-          // Item background
-          ctx.fillStyle = 'rgba(20, 40, 30, 0.8)';
-          ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
-          ctx.lineWidth = 2;
-          ctx.beginPath();
-          ctx.rect(itemRectX, itemRectY, itemRectW, itemRectH);
-          ctx.fill();
-          ctx.stroke();
-
-          // Item name
-          ctx.fillStyle = '#ffffff';
-          ctx.font = 'bold 14px ui-monospace, Menlo, Consolas, monospace';
-          ctx.textAlign = 'left';
-          ctx.textBaseline = 'top';
-          ctx.fillText('Candybar', itemRectX + 10, itemRectY + 6);
-
-          // Price (increases by $25 each purchase)
-          const priceText = `$${vendingMachine.candyBarPrice}`;
-          const canAfford = false; // Money system removed
-          ctx.fillStyle = '#ffffff';
-          ctx.font = 'bold 14px ui-monospace, Menlo, Consolas, monospace';
-          ctx.textAlign = 'right';
-          ctx.fillText(priceText, itemRectX + itemRectW - 10, itemRectY + 14);
-
-          // Buy button indicator
-          if (canAfford) {
-            ctx.fillStyle = '#ffffff';
-            ctx.font = '11px ui-monospace, Menlo, Consolas, monospace';
-            ctx.textAlign = 'right';
-            ctx.fillText(
-              'Click to buy',
-              itemRectX + itemRectW - 10,
-              itemRectY + 32
-            );
-          } else {
-            ctx.fillStyle = '#ff6666'; // Red for cannot afford
-            ctx.font = '11px ui-monospace, Menlo, Consolas, monospace';
-            ctx.textAlign = 'right';
-            ctx.fillText(
-              'Cannot afford',
-              itemRectX + itemRectW - 10,
-              itemRectY + 32
-            );
-          }
-
-          // Instructions
-          ctx.fillStyle = '#ffffff';
-          ctx.font = '11px ui-monospace, Menlo, Consolas, monospace';
-          ctx.textAlign = 'center';
-          ctx.textBaseline = 'bottom';
-          ctx.fillText(
-            'Press Spacebar to close | Click item to purchase',
-            shopX + shopWidth / 2,
-            shopY + shopHeight - 10
-          );
-
-          ctx.restore();
-        }
-
-        function purchaseVendingMachineItem() {
-          // Money system removed - function stub
-          return;
-          // Check if player can afford candybar
-          if (money.amount >= vendingMachine.candyBarPrice) {
-            // Deduct money and increase price
-            money.amount -= vendingMachine.candyBarPrice;
-            vendingMachine.candyBarPrice += 25;
-
-            // Add chocolate bar to equipment slot (increase count)
-            inventory.chocolateBarCount += 1;
-          }
-        }
-
         function purchaseItem(itemIndex) {
           // Shop system removed - function stub
           return;
@@ -5516,8 +5377,6 @@
             characterName = 'Candy Kid';
           } else if (oldGuy.dialogue) {
             characterName = 'Uncle Bernie';
-          } else if (candyKid.dialogue) {
-            characterName = 'Candy Kid';
           } else if (curator.dialogue) {
             characterName = 'Museum Curator';
           }
@@ -5547,7 +5406,7 @@
             ? systemMessage.text
             : tutorial.active
             ? tutorial.dialogue
-            : oldGuy.dialogue || candyKid.dialogue || curator.dialogue || '';
+            : oldGuy.dialogue || curator.dialogue || '';
           const words = dialogueText.split(' ');
           let line = '';
           // Start text below character name and line (add extra space if name exists)
