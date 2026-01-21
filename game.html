@@ -303,6 +303,7 @@
           displayCases: [], // Array of display cases: {row, col, artifact: null or {name, sprite}}
           selectedArtifactIndex: null, // Index of selected artifact in inventory (for build mode)
           cannonDisplay: null, // Special 1x2 display for cannon artifact only: {artifact: null or {name, sprite, tier}}
+          hasInitializedDisplays: false, // Keep displays across museum visits
         };
 
         // Day/Time system
@@ -520,6 +521,7 @@
           actualReward: 0,
           isSecretX: false, // Track if this minigame came from a secret X tile
           selectedTypo: null, // Store which typo was selected for highlighting
+          showInstructions: false, // Track if question mark was clicked
         };
 
         // Optimize sprite loading: set imageSmoothingEnabled before src for faster rendering
@@ -627,9 +629,7 @@
                       : 0;
                   tileMap[row][col] = {
                     name: def.name,
-                    canvas: createTileCanvas((ctx) =>
-                      def.draw(ctx, rotation)
-                    ),
+                    canvas: createTileCanvas((ctx) => def.draw(ctx, rotation)),
                     grassRotation: rotation, // Preserve rotation
                   };
                 }
@@ -698,7 +698,6 @@
         // const vendingMachineSprite = new Image();
         // vendingMachineSprite.imageSmoothingEnabled = false;
         // vendingMachineSprite.src = 'assets/sprites/Vending_Machine.png';
-
 
         // Minigame reward sprites
         const bulletsSprite = new Image();
@@ -1006,30 +1005,13 @@
             weight: 2, // Twice as common (doubled from 1)
             draw(ctx) {
               // Always use grass sprite (only draw if loaded)
-              // Secret X tiles - show grass with yellow/orange X pattern (visible for testing)
+              // Secret X tiles: base is grass only (yellow X is drawn later if radar is active)
               ctx.imageSmoothingEnabled = false;
               if (grassSprite.complete && grassSprite.naturalWidth > 0) {
                 ctx.drawImage(grassSprite, 0, 0, tileSize, tileSize);
               } else {
                 // Fallback: draw grass base color if sprite not loaded yet
                 paintGrassBase(ctx);
-              }
-              // Draw yellow X sprite only if radar is active
-              // This makes secret X tiles invisible unless player has radar
-              // Check if radar exists and is active (radar is defined later in code)
-              // Use try-catch to safely check radar since it's defined later
-              try {
-                if (
-                  typeof radar !== 'undefined' &&
-                  radar &&
-                  radar.active &&
-                  yellowXSprite.complete &&
-                  yellowXSprite.naturalWidth > 0
-                ) {
-                  ctx.drawImage(yellowXSprite, 0, 0, tileSize, tileSize);
-                }
-              } catch (e) {
-                // Radar not defined yet, don't draw yellow X (tiles will be invisible until radar is active)
               }
             },
           },
@@ -1071,6 +1053,26 @@
           return false;
         }
 
+        // Helper function to check if a tile position overlaps with NPCs
+        function isNpcAtTile(row, col) {
+          const tileCenterX = (col + 0.5) * tileSize;
+          const tileCenterY = (row + 0.5) * tileSize;
+          const npcs = [oldGuy, joseph];
+
+          for (let i = 0; i < npcs.length; i++) {
+            const npc = npcs[i];
+            if (!npc) continue;
+            const dx = npc.x - tileCenterX;
+            const dy = npc.y - tileCenterY;
+            const npcRadius = npc.radius || tileSize * 0.5;
+            const minDist = tileSize / 2 + npcRadius;
+            if (dx * dx + dy * dy < minDist * minDist) {
+              return true;
+            }
+          }
+          return false;
+        }
+
         // Function to generate tiles (used at start and when resetting days)
         function generateTiles() {
           const newTileMap = [];
@@ -1082,7 +1084,7 @@
               // If redX or secretX tile was picked and there's a tree at this position, replace with grass
               if (
                 (def.name === 'redX' || def.name === 'secretX') &&
-                isTreeAtTile(row, col)
+                (isTreeAtTile(row, col) || isNpcAtTile(row, col))
               ) {
                 def = tileDefinitions.find((d) => d.name === 'grass');
               }
@@ -1303,18 +1305,21 @@
               ) {
                 return;
               }
+              // If tutorial is active, close it immediately on Space.
+              // This avoids requiring a "fresh" key press to dismiss the popup.
+              if (tutorial.active && gameState !== 'museum') {
+                tutorial.active = false;
+                player.vx = 0;
+                player.vy = 0;
+                return;
+              }
               // Only process dialogue/interaction on key press, not while held
               // This prevents dialogue from skipping too fast when holding spacebar
               if (!keyJustPressed['Space']) {
                 return; // Key already processed this frame
               }
               // If dialogue is showing, advance it (only once per key press)
-              // Skip tutorial check in museum state (tutorial doesn't apply there)
-              if (tutorial.active && gameState !== 'museum') {
-                tutorial.active = false; // Close tutorial
-                player.vx = 0;
-                player.vy = 0;
-              } else if (
+              if (
                 systemMessage.text ||
                 oldGuy.dialogue ||
                 joseph.dialogue ||
@@ -1375,7 +1380,8 @@
                   // Check cannonBuff interaction - use fixed distance for reliability
                   const cannonDx = player.x - cannonBuff.x;
                   const cannonDy = player.y - cannonBuff.y;
-                  const cannonDistSq = cannonDx * cannonDx + cannonDy * cannonDy;
+                  const cannonDistSq =
+                    cannonDx * cannonDx + cannonDy * cannonDy;
 
                   if (cannonDistSq <= interactionDistSq) {
                     // Check if cannon is placed in museum
@@ -1392,7 +1398,7 @@
                         "Wow! A cannon! I don't know how you did it, but here it is!";
                     } else if (hasCannon && cannonBuff.hasGivenReward) {
                       // After reward given
-                      cannonBuff.dialogue = "Good luck!";
+                      cannonBuff.dialogue = 'Good luck!';
                       cannonBuff.dialogueStage = 0;
                     } else if (!cannonBuff.hasCompletedIntro) {
                       // Initial intro dialogue - activate quest
@@ -1444,12 +1450,19 @@
               museum.doorPrompt = false;
               museum.wasNearDoor = false;
               museum.buildMode = false;
+              museum.cannonDisplay = null;
+              museum.displayCases = [];
+              museum.hasInitializedDisplays = false;
               gameOver.active = false;
               return;
             }
 
             // Controls screen: Space to continue to game (only on key press, not hold)
-            if (gameState === 'controls' && e.code === 'Space' && keyJustPressed['Space']) {
+            if (
+              gameState === 'controls' &&
+              e.code === 'Space' &&
+              keyJustPressed['Space']
+            ) {
               e.preventDefault();
               // Initialize day/time system for new game
               dayTime.currentDay = 0; // Start on Monday
@@ -1476,6 +1489,9 @@
               museum.doorPrompt = false;
               museum.wasNearDoor = false;
               museum.buildMode = false;
+              museum.cannonDisplay = null;
+              museum.displayCases = [];
+              museum.hasInitializedDisplays = false;
 
               // Reset game over state
               gameOver.active = false;
@@ -1506,6 +1522,13 @@
               tileRegenerationScheduled = false; // Reset flag to allow regeneration
               // Force immediate regeneration to ensure all sprite-based tiles are properly rendered
               doRegenerateTiles(); // Call directly to ensure it happens synchronously
+              // Reset museum state
+              museum.doorPrompt = false;
+              museum.wasNearDoor = false;
+              museum.buildMode = false;
+              museum.cannonDisplay = null;
+              museum.displayCases = [];
+              museum.hasInitializedDisplays = false;
               // Reset game state
               gameState = 'playing';
             }
@@ -1522,44 +1545,54 @@
         let mouseX = 0;
         let mouseY = 0;
 
-        // Handle right clicks for minesweeper (contextmenu prevention)
+        // Prevent the browser context menu while Minesweeper is active
         canvas.addEventListener('contextmenu', (e) => {
-          if (
-            minesweeperMinigame.active &&
-            !minesweeperMinigame.gameOver &&
-            !minesweeperMinigame.won
-          ) {
+          if (minesweeperMinigame.active) {
             e.preventDefault();
-            const rect = canvas.getBoundingClientRect();
-            const scaleX = canvas.width / rect.width;
-            const scaleY = canvas.height / rect.height;
-            const x = (e.clientX - rect.left) * scaleX;
-            const y = (e.clientY - rect.top) * scaleY;
+          }
+        });
 
-            const gridSize = minesweeperMinigame.gridSize;
-            const cellSize = 50; // Match render function (increased from 40)
-            const panelPadding = 40;
-            const gridAreaSize = gridSize * cellSize;
-            const panelWidth = gridAreaSize + panelPadding * 2;
-            const panelHeight = panelWidth; // Square panel
-            const panelX = (canvas.width - panelWidth) / 2;
-            const panelY = (canvas.height - panelHeight) / 2;
-            const gridStartX = panelX + panelPadding;
-            const gridStartY = panelY + panelPadding;
+        // Handle right clicks for Minesweeper (more reliable than contextmenu)
+        canvas.addEventListener('mousedown', (e) => {
+          if (e.button !== 2) return; // Right click only
+          if (
+            !minesweeperMinigame.active ||
+            minesweeperMinigame.gameOver ||
+            minesweeperMinigame.won
+          ) {
+            return;
+          }
 
-            // Check if click is within grid bounds
-            if (
-              x >= gridStartX &&
-              x <= gridStartX + gridSize * cellSize &&
-              y >= gridStartY &&
-              y <= gridStartY + gridSize * cellSize
-            ) {
-              const col = Math.floor((x - gridStartX) / cellSize);
-              const row = Math.floor((y - gridStartY) / cellSize);
+          e.preventDefault();
+          const rect = canvas.getBoundingClientRect();
+          const scaleX = canvas.width / rect.width;
+          const scaleY = canvas.height / rect.height;
+          const x = (e.clientX - rect.left) * scaleX;
+          const y = (e.clientY - rect.top) * scaleY;
 
-              if (row >= 0 && row < gridSize && col >= 0 && col < gridSize) {
-                handleMinesweeperClick(minesweeperMinigame, row, col, true);
-              }
+          const gridSize = minesweeperMinigame.gridSize;
+          const cellSize = 50; // Match render function
+          const panelPadding = 40;
+          const gridAreaSize = gridSize * cellSize;
+          const panelWidth = gridAreaSize + panelPadding * 2;
+          const panelHeight = panelWidth; // Square panel
+          const panelX = (canvas.width - panelWidth) / 2;
+          const panelY = (canvas.height - panelHeight) / 2;
+          const gridStartX = panelX + panelPadding;
+          const gridStartY = panelY + panelPadding;
+
+          // Check if click is within grid bounds
+          if (
+            x >= gridStartX &&
+            x <= gridStartX + gridSize * cellSize &&
+            y >= gridStartY &&
+            y <= gridStartY + gridSize * cellSize
+          ) {
+            const col = Math.floor((x - gridStartX) / cellSize);
+            const row = Math.floor((y - gridStartY) / cellSize);
+
+            if (row >= 0 && row < gridSize && col >= 0 && col < gridSize) {
+              handleMinesweeperClick(minesweeperMinigame, row, col, true);
             }
           }
         });
@@ -1671,12 +1704,20 @@
           if (gameState === 'museum' && museum.buildMode) {
             // First, check if player clicked the build mode inventory panel
             const buildLayout = getBuildModeInventoryLayout();
-            
+
             // Check if clicking on red X delete button (bottom right of panel)
             const deleteButtonSize = 32;
-            const deleteButtonX = buildLayout.panelX + buildLayout.panelWidth - deleteButtonSize - 8;
-            const deleteButtonY = buildLayout.panelY + buildLayout.panelHeight - deleteButtonSize - 8;
-            
+            const deleteButtonX =
+              buildLayout.panelX +
+              buildLayout.panelWidth -
+              deleteButtonSize -
+              8;
+            const deleteButtonY =
+              buildLayout.panelY +
+              buildLayout.panelHeight -
+              deleteButtonSize -
+              8;
+
             if (
               x >= deleteButtonX &&
               x <= deleteButtonX + deleteButtonSize &&
@@ -1685,7 +1726,8 @@
             ) {
               // Check if an artifact slot is selected
               if (museum.selectedArtifactIndex !== null) {
-                const selectedItem = inventory.slots[museum.selectedArtifactIndex];
+                const selectedItem =
+                  inventory.slots[museum.selectedArtifactIndex];
                 if (selectedItem && selectedItem.type === 'artifact') {
                   // Delete the selected artifact
                   inventory.slots[museum.selectedArtifactIndex] = null;
@@ -1694,7 +1736,7 @@
               }
               return;
             }
-            
+
             if (
               x >= buildLayout.panelX &&
               x <= buildLayout.panelX + buildLayout.panelWidth &&
@@ -1857,42 +1899,83 @@
           }
 
           // Typo minigame clicks
-          if (typoMinigame.active && !typoMinigame.answered) {
-            // Calculate button positions (same as in render function)
-            const panelWidth = 700;
-            const panelHeight = 500;
-            const panelX = (canvas.width - panelWidth) / 2;
-            const panelY = (canvas.height - panelHeight) / 2;
-
-            const buttonY = panelY + panelHeight - 80;
-            const buttonWidth = 150;
-            const buttonHeight = 40;
-            const buttonSpacing = 20;
-            const totalButtonWidth = buttonWidth * 2 + buttonSpacing;
-            const buttonStartX = canvas.width / 2 - totalButtonWidth / 2;
-
-            // Display button (left)
-            const displayButtonX = buttonStartX;
+          if (typoMinigame.active) {
+            // Check for question mark click first
+            const questionMarkX = 15;
+            const questionMarkY = canvas.height - 15;
+            const questionMarkSize = 34; // Slightly bigger for visibility
+            const questionMarkPadding = 6;
             if (
-              x >= displayButtonX &&
-              x <= displayButtonX + buttonWidth &&
-              y >= buttonY &&
-              y <= buttonY + buttonHeight
+              x >= questionMarkX - questionMarkPadding &&
+              x <= questionMarkX + questionMarkSize + questionMarkPadding &&
+              y >= questionMarkY - questionMarkSize - questionMarkPadding &&
+              y <= questionMarkY + questionMarkPadding
             ) {
-              handleTypoAnswer(true); // Display = Real
+              // Toggle instructions
+              typoMinigame.showInstructions = !typoMinigame.showInstructions;
               return;
             }
 
-            // Throw away button (right)
-            const throwAwayButtonX = buttonStartX + buttonWidth + buttonSpacing;
-            if (
-              x >= throwAwayButtonX &&
-              x <= throwAwayButtonX + buttonWidth &&
-              y >= buttonY &&
-              y <= buttonY + buttonHeight
-            ) {
-              handleTypoAnswer(false); // Throw away = Fake
+            // If instructions are showing, close them on any click
+            if (typoMinigame.showInstructions) {
+              const instructionsPanelWidth = 460;
+              const instructionsPanelHeight = 200;
+              const instructionsPanelX =
+                (canvas.width - instructionsPanelWidth) / 2;
+              const instructionsPanelY =
+                (canvas.height - instructionsPanelHeight) / 2;
+
+              if (
+                x < instructionsPanelX ||
+                x > instructionsPanelX + instructionsPanelWidth ||
+                y < instructionsPanelY ||
+                y > instructionsPanelY + instructionsPanelHeight
+              ) {
+                typoMinigame.showInstructions = false;
+                return;
+              }
+              // Clicked inside instructions panel - keep it open
               return;
+            }
+
+            if (!typoMinigame.answered) {
+              // Calculate button positions (same as in render function)
+              const panelWidth = 700;
+              const panelHeight = 500;
+              const panelX = (canvas.width - panelWidth) / 2;
+              const panelY = (canvas.height - panelHeight) / 2;
+
+              const buttonY = panelY + panelHeight - 80;
+              const buttonWidth = 150;
+              const buttonHeight = 40;
+              const buttonSpacing = 20;
+              const totalButtonWidth = buttonWidth * 2 + buttonSpacing;
+              const buttonStartX = canvas.width / 2 - totalButtonWidth / 2;
+
+              // Display button (left)
+              const displayButtonX = buttonStartX;
+              if (
+                x >= displayButtonX &&
+                x <= displayButtonX + buttonWidth &&
+                y >= buttonY &&
+                y <= buttonY + buttonHeight
+              ) {
+                handleTypoAnswer(true); // Display = Real
+                return;
+              }
+
+              // Throw away button (right)
+              const throwAwayButtonX =
+                buttonStartX + buttonWidth + buttonSpacing;
+              if (
+                x >= throwAwayButtonX &&
+                x <= throwAwayButtonX + buttonWidth &&
+                y >= buttonY &&
+                y <= buttonY + buttonHeight
+              ) {
+                handleTypoAnswer(false); // Throw away = Fake
+                return;
+              }
             }
           }
 
@@ -1901,15 +1984,17 @@
             // Check for question mark click first (works even when game is over/won)
             const questionMarkX = 15;
             const questionMarkY = canvas.height - 15;
-            const questionMarkSize = 28; // Increased from 20 to make question mark bigger
+            const questionMarkSize = 34; // Slightly bigger for visibility
+            const questionMarkPadding = 6;
             if (
-              x >= questionMarkX - 5 &&
-              x <= questionMarkX + questionMarkSize + 5 &&
-              y >= questionMarkY - questionMarkSize - 5 &&
-              y <= questionMarkY + 5
+              x >= questionMarkX - questionMarkPadding &&
+              x <= questionMarkX + questionMarkSize + questionMarkPadding &&
+              y >= questionMarkY - questionMarkSize - questionMarkPadding &&
+              y <= questionMarkY + questionMarkPadding
             ) {
               // Toggle instructions
-              minesweeperMinigame.showInstructions = !minesweeperMinigame.showInstructions;
+              minesweeperMinigame.showInstructions =
+                !minesweeperMinigame.showInstructions;
               return;
             }
 
@@ -1918,9 +2003,11 @@
               // Check if click is outside the instructions panel
               const instructionsPanelWidth = 400;
               const instructionsPanelHeight = 200;
-              const instructionsPanelX = (canvas.width - instructionsPanelWidth) / 2;
-              const instructionsPanelY = (canvas.height - instructionsPanelHeight) / 2;
-              
+              const instructionsPanelX =
+                (canvas.width - instructionsPanelWidth) / 2;
+              const instructionsPanelY =
+                (canvas.height - instructionsPanelHeight) / 2;
+
               if (
                 x < instructionsPanelX ||
                 x > instructionsPanelX + instructionsPanelWidth ||
@@ -1970,15 +2057,17 @@
             // Check for question mark click first
             const questionMarkX = 15;
             const questionMarkY = canvas.height - 15;
-            const questionMarkSize = 28; // Increased from 20 to make question mark bigger
+            const questionMarkSize = 34; // Slightly bigger for visibility
+            const questionMarkPadding = 6;
             if (
-              x >= questionMarkX - 5 &&
-              x <= questionMarkX + questionMarkSize + 5 &&
-              y >= questionMarkY - questionMarkSize - 5 &&
-              y <= questionMarkY + 5
+              x >= questionMarkX - questionMarkPadding &&
+              x <= questionMarkX + questionMarkSize + questionMarkPadding &&
+              y >= questionMarkY - questionMarkSize - questionMarkPadding &&
+              y <= questionMarkY + questionMarkPadding
             ) {
               // Toggle instructions
-              brushingMinigame.showInstructions = !brushingMinigame.showInstructions;
+              brushingMinigame.showInstructions =
+                !brushingMinigame.showInstructions;
               return;
             }
 
@@ -1987,9 +2076,11 @@
               // Check if click is outside the instructions panel
               const instructionsPanelWidth = 400;
               const instructionsPanelHeight = 200;
-              const instructionsPanelX = (canvas.width - instructionsPanelWidth) / 2;
-              const instructionsPanelY = (canvas.height - instructionsPanelHeight) / 2;
-              
+              const instructionsPanelX =
+                (canvas.width - instructionsPanelWidth) / 2;
+              const instructionsPanelY =
+                (canvas.height - instructionsPanelHeight) / 2;
+
               if (
                 x < instructionsPanelX ||
                 x > instructionsPanelX + instructionsPanelWidth ||
@@ -2077,7 +2168,7 @@
             const deleteButtonSize = 40;
             const deleteButtonX = panelX + inventoryWidth + 20;
             const deleteButtonY = panelY + titleHeight;
-            
+
             if (
               x >= deleteButtonX &&
               x <= deleteButtonX + deleteButtonSize &&
@@ -2086,7 +2177,8 @@
             ) {
               // Check if an artifact slot is selected
               if (inventory.selectedSlotIndex !== null) {
-                const selectedItem = inventory.slots[inventory.selectedSlotIndex];
+                const selectedItem =
+                  inventory.slots[inventory.selectedSlotIndex];
                 if (selectedItem && selectedItem.type === 'artifact') {
                   // Delete the selected artifact
                   inventory.slots[inventory.selectedSlotIndex] = null;
@@ -2110,7 +2202,7 @@
                   y <= slotY + slotSize
                 ) {
                   const item = inventory.slots[slotIndex];
-                  
+
                   // Check if selecting artifact for Joseph
                   if (
                     joseph.selectingArtifact &&
@@ -2176,7 +2268,8 @@
           const cannonRow = Math.floor(museum.height / 2) - 2; // Row 6
           const rightCannonCol = Math.floor(museum.width / 2); // Col 8
           // Center cannonBuff in the tile (add half tile size to center it)
-          cannonBuff.x = (rightCannonCol + 2) * museumTileSize + museumTileSize / 2; // 2 tiles to the right of right cannon, centered
+          cannonBuff.x =
+            (rightCannonCol + 2) * museumTileSize + museumTileSize / 2; // 2 tiles to the right of right cannon, centered
           cannonBuff.y = cannonRow * museumTileSize + museumTileSize / 2; // Same row as cannons, centered
 
           // Position camera to place museum at bottom middle of screen
@@ -2200,35 +2293,31 @@
           museum.doorPrompt = false;
           museum.wasNearDoor = false;
           museum.buildMode = false;
-          museum.cannonDisplay = null; // Reset cannon display
           // Note: cannonBuff.hasGivenReward is NOT reset here - reward persists across days
+          // Initialize display cases once per game so placed artifacts persist
+          if (!museum.hasInitializedDisplays) {
+            museum.cannonDisplay = null;
+            // Initialize display cases along the walls (top, left, right)
+            // Keep them away from corners so the room feels less cramped
+            museum.displayCases = [];
+            // Top wall cases (row 1 = inside the top wall)
+            museum.displayCases.push({ row: 1, col: 3, artifact: null });
+            museum.displayCases.push({ row: 1, col: 6, artifact: null });
+            museum.displayCases.push({ row: 1, col: 9, artifact: null });
+            museum.displayCases.push({ row: 1, col: 12, artifact: null });
+            // Left wall cases (col 1 = inside the left wall)
+            museum.displayCases.push({ row: 3, col: 1, artifact: null });
+            museum.displayCases.push({ row: 6, col: 1, artifact: null });
+            museum.displayCases.push({ row: 9, col: 1, artifact: null });
+            museum.displayCases.push({ row: 12, col: 1, artifact: null });
+            // Right wall cases (col 14 = inside the right wall)
+            museum.displayCases.push({ row: 3, col: 14, artifact: null });
+            museum.displayCases.push({ row: 6, col: 14, artifact: null });
+            museum.displayCases.push({ row: 9, col: 14, artifact: null });
+            museum.displayCases.push({ row: 12, col: 14, artifact: null });
 
-          // Initialize display cases along the walls (top, left, right)
-          // Keep them away from corners so the room feels less cramped
-          museum.displayCases = [];
-          // Top wall cases (row 1 = inside the top wall)
-          museum.displayCases.push({ row: 1, col: 3, artifact: null });
-          museum.displayCases.push({ row: 1, col: 6, artifact: null });
-          museum.displayCases.push({ row: 1, col: 9, artifact: null });
-          museum.displayCases.push({ row: 1, col: 12, artifact: null });
-          // Left wall cases (col 1 = inside the left wall)
-          museum.displayCases.push({ row: 3, col: 1, artifact: null });
-          museum.displayCases.push({ row: 6, col: 1, artifact: null });
-          museum.displayCases.push({ row: 9, col: 1, artifact: null });
-          museum.displayCases.push({ row: 12, col: 1, artifact: null });
-          // Right wall cases (col 14 = inside the right wall)
-          museum.displayCases.push({ row: 3, col: 14, artifact: null });
-          museum.displayCases.push({ row: 6, col: 14, artifact: null });
-          museum.displayCases.push({ row: 9, col: 14, artifact: null });
-          museum.displayCases.push({ row: 12, col: 14, artifact: null });
-
-          // Give one of each artifact for testing
-          addItemToInventory('Rusty Nails', rustyNailsSprite);
-          addItemToInventory('Bullets', bulletsSprite);
-          addItemToInventory('Grapeshot', grapeshotSprite);
-          addItemToInventory('Ornate pin', pinSprite);
-          addItemToInventory('Canteen', canteenSprite);
-          addItemToInventory('Cannon', cannonSprite); // Add cannon for testing
+            museum.hasInitializedDisplays = true;
+          }
         }
 
         // Function to start a new day
@@ -2293,7 +2382,6 @@
 
         function update(dtMs) {
           const dt = (dtMs || 16.67) / 1000; // seconds
-
 
           // Update day/time system (only when playing)
           if (gameState === 'playing') {
@@ -2972,8 +3060,7 @@
             joseph.dialogue =
               "Since I don't have much use for this radar, you can have it - do me a favor.";
           } else if (joseph.dialogueStage === 5) {
-            joseph.dialogue =
-              "I'll swap it with a rare or rarer artifact!";
+            joseph.dialogue = "I'll swap it with a rare or rarer artifact!";
           } else if (joseph.dialogueStage === 6) {
             // Check if player has rare or higher artifacts (excluding cannon)
             const rareArtifacts = inventory.slots.filter(
@@ -2989,7 +3076,7 @@
             if (rareArtifacts.length > 0) {
               // Player has rare+ artifacts - ask them to select one
               joseph.dialogue =
-                "I need a rare or higher artifact for my collection. Choose one from your inventory!";
+                'I need a rare or higher artifact for my collection. Choose one from your inventory!';
               joseph.selectingArtifact = true;
               // Automatically open inventory so player can select an artifact
               inventory.open = true;
@@ -3044,19 +3131,18 @@
             // Player has artifacts - dialogue sequence (stages 1-5)
             if (curator.dialogueStage === 1) {
               curator.dialogue =
-                'Did you know the first museum was the Ennigaldi-Nana\'s museum, most likley created in 530 B.C.?';
+                "Did you know the first museum was the Ennigaldi-Nana's museum, most likley created in 530 B.C.?";
             } else if (curator.dialogueStage === 2) {
-              curator.dialogue =
-                "It too, had artifacts lined up in its halls.";
+              curator.dialogue = 'It too, had artifacts lined up in its halls.';
             } else if (curator.dialogueStage === 3) {
               curator.dialogue =
                 'If you want to do the same, use "E" to enter build mode.';
             } else if (curator.dialogueStage === 4) {
               curator.dialogue =
-                "There, you can choose which artifacts to put in the displays!";
+                'There, you can choose which artifacts to put in the displays!';
             } else if (curator.dialogueStage === 5) {
               curator.dialogue =
-                "I hear that you will be rewarded if you get the best artifacts by the end of the week...";
+                'I hear that you will be rewarded if you get the best artifacts by the end of the week...';
               curator.hasCompletedIntro = true; // Mark intro as complete
             } else if (curator.dialogueStage >= 6) {
               curator.dialogue = null;
@@ -3065,8 +3151,7 @@
           } else {
             // Player has no artifacts - two stages (1, 2)
             if (curator.dialogueStage === 1) {
-              curator.dialogue =
-                "Dig up some artifacts, then we can talk.";
+              curator.dialogue = 'Dig up some artifacts, then we can talk.';
             } else if (curator.dialogueStage >= 2) {
               curator.dialogue = null;
               curator.dialogueStage = 0;
@@ -3088,13 +3173,13 @@
             // Reward dialogue sequence (4 stages: 0, 1, 2, 3)
             if (cannonBuff.dialogueStage === 1) {
               cannonBuff.dialogue =
-                "As your reward, I will give you these new shoes.";
+                'As your reward, I will give you these new shoes.';
             } else if (cannonBuff.dialogueStage === 2) {
               cannonBuff.dialogue =
                 "I was going to hike Henry Knox's trail with these, but I think i'll just admire this cannon instead.";
             } else if (cannonBuff.dialogueStage === 3) {
               cannonBuff.dialogue =
-                "They make you lose less stamina while sprinting! Good luck filling out your museum!";
+                'They make you lose less stamina while sprinting! Good luck filling out your museum!';
             } else if (cannonBuff.dialogueStage >= 4) {
               // Give Quick shoes reward and complete sequence
               stamina.hasShoes = true;
@@ -3115,7 +3200,7 @@
             // Initial dialogue sequence (4 stages: 0, 1, 2, 3)
             if (cannonBuff.dialogueStage === 1) {
               cannonBuff.dialogue =
-                "Did you know that in the winter of 1775-76, this colonel called Henry Knox hauled 60 tons of these over 300 miles?";
+                'Did you know that in the winter of 1775-76, this colonel called Henry Knox hauled 60 tons of these over 300 miles?';
             } else if (cannonBuff.dialogueStage === 2) {
               cannonBuff.dialogue =
                 'Its true! It\'s called the "Henry Knox Noble Train of Artillety".';
@@ -3151,7 +3236,12 @@
           }
 
           // Don't start new dialogue if one is already showing
-          if (oldGuy.dialogue || joseph.dialogue || curator.dialogue || cannonBuff.dialogue) {
+          if (
+            oldGuy.dialogue ||
+            joseph.dialogue ||
+            curator.dialogue ||
+            cannonBuff.dialogue
+          ) {
             return;
           }
 
@@ -3181,12 +3271,11 @@
               } else if (hasArtifacts) {
                 // First time with artifacts - start intro dialogue sequence
                 curator.dialogue =
-                  'Did you know the first museum was the Ennigaldi-Nana\'s museum, most likley created in 530 B.C.?';
+                  "Did you know the first museum was the Ennigaldi-Nana's museum, most likley created in 530 B.C.?";
                 curator.dialogueStage = 1;
               } else {
                 // No artifacts - start "no artifacts" dialogue sequence
-                curator.dialogue =
-                  "Looks like you don't have any artifacts.";
+                curator.dialogue = "Looks like you don't have any artifacts.";
                 curator.dialogueStage = 1;
               }
               curator.dialogueTimer = 0; // Don't auto-close, wait for Spacebar press
@@ -3220,7 +3309,7 @@
                   "Wow! A cannon! I don't know how you did it, but here it is!";
               } else if (hasCannon && cannonBuff.hasGivenReward) {
                 // After reward given
-                cannonBuff.dialogue = "Good luck!";
+                cannonBuff.dialogue = 'Good luck!';
                 cannonBuff.dialogueStage = 0;
               } else if (!cannonBuff.hasCompletedIntro) {
                 // Initial intro dialogue - activate quest
@@ -3283,7 +3372,9 @@
           if (distSq <= minDistSq * 2.0) {
             // Start Joseph dialogue sequence if not completed
             if (!joseph.hasGivenRadar) {
-              joseph.dialogueStage = 0;
+              // Start at stage 1 so the first Space press advances to stage 2
+              // (prevents the first sentence from repeating).
+              joseph.dialogueStage = 1;
               joseph.dialogue =
                 'Did you know that radars can detect hidden things underground?';
             } else {
@@ -3321,15 +3412,17 @@
                   // Randomly select one of four minigames with equal probability (25% each)
                   // Select one of four minigames (removed 'declaration' - it's now handled by 'typo')
                   const minigames = ['brushing', 'minesweeper', 'typo'];
-                  const randomIndex = Math.floor(Math.random() * minigames.length);
+                  const randomIndex = Math.floor(
+                    Math.random() * minigames.length
+                  );
                   crouchAnimation.pendingMinigame = minigames[randomIndex];
                   // Store whether this is a secret X tile for later reward multiplier
                   crouchAnimation.isSecretX = tile.name === 'secretX';
-                  
+
                   // Store tile position for conversion to grass
                   crouchAnimation.tileRow = row;
                   crouchAnimation.tileCol = col;
-                  
+
                   // Convert X tile to grass immediately when interacted with
                   const grassDef = tileDefinitions.find(
                     (def) => def.name === 'grass'
@@ -3422,16 +3515,6 @@
                 type: isArtifact ? 'artifact' : 'item', // Mark artifacts for build mode
                 tier: tier, // common, uncommon, rare (artifacts only)
               };
-              // Check if this is an artifact and quest is active
-              if (
-                quests.findArtifactWithRadar.active &&
-                !quests.findArtifactWithRadar.completed &&
-                radar.active
-              ) {
-                // Player found an artifact using the radar - complete quest!
-                quests.findArtifactWithRadar.completed = true;
-                quests.findArtifactWithRadar.active = false; // Quest complete, no longer show
-              }
               return true; // Successfully added
             }
           }
@@ -3449,10 +3532,29 @@
         // Legendary: Cannon (5%) = 5% total (7.5% for secret X)
         function giveMinigameReward() {
           // Check if this reward is from a radar-discovered secret X
-          const isSecretX = brushingMinigame.isSecretX || minesweeperMinigame.isSecretX || typoMinigame.isSecretX;
-          
+          const isSecretX =
+            brushingMinigame.isSecretX ||
+            minesweeperMinigame.isSecretX ||
+            typoMinigame.isSecretX;
+
+          // Helper to add rewards and only complete radar quest on yellow X digs
+          const tryAddReward = (name, sprite) => {
+            const added = addItemToInventory(name, sprite);
+            if (
+              added &&
+              isSecretX &&
+              quests.findArtifactWithRadar.active &&
+              !quests.findArtifactWithRadar.completed
+            ) {
+              // Player found an artifact from a yellow X - complete quest
+              quests.findArtifactWithRadar.completed = true;
+              quests.findArtifactWithRadar.active = false;
+            }
+            return added;
+          };
+
           let roll = Math.random();
-          
+
           if (isSecretX) {
             // Radar-discovered X: 10% lower common chance, spread evenly to other rarities
             // Common: 30% (15% Rusty Nails, 15% Bullets)
@@ -3460,39 +3562,42 @@
             // Rare: 17.5% (8.75% Ornate pin, 8.75% Canteen)
             // Super Rare: 10% (Cannon Shards)
             // Legendary: 7.5% (Cannon)
-            
+
             if (roll < 0.15) {
               // 15% chance - Rusty Nails (common)
               if (
                 rustyNailsSprite.complete &&
                 rustyNailsSprite.naturalWidth > 0
               ) {
-                return addItemToInventory('Rusty Nails', rustyNailsSprite);
+                return tryAddReward('Rusty Nails', rustyNailsSprite);
               }
-            } else if (roll < 0.30) {
+            } else if (roll < 0.3) {
               // 15% chance - Bullets (common)
               if (bulletsSprite.complete && bulletsSprite.naturalWidth > 0) {
-                return addItemToInventory('Bullets', bulletsSprite);
+                return tryAddReward('Bullets', bulletsSprite);
               }
             } else if (roll < 0.475) {
               // 17.5% chance - Grapeshot (uncommon)
-              if (grapeshotSprite.complete && grapeshotSprite.naturalWidth > 0) {
-                return addItemToInventory('Grapeshot', grapeshotSprite);
+              if (
+                grapeshotSprite.complete &&
+                grapeshotSprite.naturalWidth > 0
+              ) {
+                return tryAddReward('Grapeshot', grapeshotSprite);
               }
             } else if (roll < 0.65) {
               // 17.5% chance - Buttons (uncommon)
               if (buttonsSprite.complete && buttonsSprite.naturalWidth > 0) {
-                return addItemToInventory('Buttons', buttonsSprite);
+                return tryAddReward('Buttons', buttonsSprite);
               }
             } else if (roll < 0.7375) {
               // 8.75% chance - Ornate pin (rare)
               if (pinSprite.complete && pinSprite.naturalWidth > 0) {
-                return addItemToInventory('Ornate pin', pinSprite);
+                return tryAddReward('Ornate pin', pinSprite);
               }
             } else if (roll < 0.825) {
               // 8.75% chance - Canteen (rare)
               if (canteenSprite.complete && canteenSprite.naturalWidth > 0) {
-                return addItemToInventory('Canteen', canteenSprite);
+                return tryAddReward('Canteen', canteenSprite);
               }
             } else if (roll < 0.925) {
               // 10% chance - Cannon Shards (super rare)
@@ -3500,48 +3605,51 @@
                 cannonShardsSprite.complete &&
                 cannonShardsSprite.naturalWidth > 0
               ) {
-                return addItemToInventory('Cannon Shards', cannonShardsSprite);
+                return tryAddReward('Cannon Shards', cannonShardsSprite);
               }
             } else {
               // 7.5% chance - Cannon (legendary)
               if (cannonSprite.complete && cannonSprite.naturalWidth > 0) {
-                return addItemToInventory('Cannon', cannonSprite);
+                return tryAddReward('Cannon', cannonSprite);
               }
             }
           } else {
             // Normal X: standard distribution
-            if (roll < 0.20) {
+            if (roll < 0.2) {
               // 20% chance - Rusty Nails (common)
               if (
                 rustyNailsSprite.complete &&
                 rustyNailsSprite.naturalWidth > 0
               ) {
-                return addItemToInventory('Rusty Nails', rustyNailsSprite);
+                return tryAddReward('Rusty Nails', rustyNailsSprite);
               }
-            } else if (roll < 0.40) {
+            } else if (roll < 0.4) {
               // 20% chance - Bullets (common)
               if (bulletsSprite.complete && bulletsSprite.naturalWidth > 0) {
-                return addItemToInventory('Bullets', bulletsSprite);
+                return tryAddReward('Bullets', bulletsSprite);
               }
             } else if (roll < 0.56) {
               // 16% chance - Grapeshot (uncommon)
-              if (grapeshotSprite.complete && grapeshotSprite.naturalWidth > 0) {
-                return addItemToInventory('Grapeshot', grapeshotSprite);
+              if (
+                grapeshotSprite.complete &&
+                grapeshotSprite.naturalWidth > 0
+              ) {
+                return tryAddReward('Grapeshot', grapeshotSprite);
               }
             } else if (roll < 0.72) {
               // 16% chance - Buttons (uncommon)
               if (buttonsSprite.complete && buttonsSprite.naturalWidth > 0) {
-                return addItemToInventory('Buttons', buttonsSprite);
+                return tryAddReward('Buttons', buttonsSprite);
               }
             } else if (roll < 0.795) {
               // 7.5% chance - Ornate pin (rare)
               if (pinSprite.complete && pinSprite.naturalWidth > 0) {
-                return addItemToInventory('Ornate pin', pinSprite);
+                return tryAddReward('Ornate pin', pinSprite);
               }
             } else if (roll < 0.87) {
               // 7.5% chance - Canteen (rare)
               if (canteenSprite.complete && canteenSprite.naturalWidth > 0) {
-                return addItemToInventory('Canteen', canteenSprite);
+                return tryAddReward('Canteen', canteenSprite);
               }
             } else if (roll < 0.95) {
               // 8% chance - Cannon Shards (super rare)
@@ -3549,12 +3657,12 @@
                 cannonShardsSprite.complete &&
                 cannonShardsSprite.naturalWidth > 0
               ) {
-                return addItemToInventory('Cannon Shards', cannonShardsSprite);
+                return tryAddReward('Cannon Shards', cannonShardsSprite);
               }
             } else {
               // 5% chance - Cannon (legendary)
               if (cannonSprite.complete && cannonSprite.naturalWidth > 0) {
-                return addItemToInventory('Cannon', cannonSprite);
+                return tryAddReward('Cannon', cannonSprite);
               }
             }
           }
@@ -3635,9 +3743,7 @@
 
             // Randomly select a document
             const selectedDocument =
-              typoDocuments[
-                Math.floor(Math.random() * typoDocuments.length)
-              ];
+              typoDocuments[Math.floor(Math.random() * typoDocuments.length)];
             typoMinigame.realExcerpt = selectedDocument.realExcerpt;
 
             // 50% chance the test excerpt is fake (has typos)
@@ -4020,7 +4126,7 @@
             // Right click = toggle flag (limit to 4 flags total)
             if (!minesweeper.revealed[row][col]) {
               const currentlyFlagged = minesweeper.flagged[row][col];
-              
+
               // Count current flags
               let flagCount = 0;
               for (let r = 0; r < minesweeper.gridSize; r++) {
@@ -4028,12 +4134,12 @@
                   if (minesweeper.flagged[r][c]) flagCount++;
                 }
               }
-              
+
               // Only allow flagging if we have less than 4 flags, or if we're unflagging
               if (!currentlyFlagged && flagCount >= 4) {
                 return; // Can't place more flags
               }
-              
+
               minesweeper.flagged[row][col] = !minesweeper.flagged[row][col];
             }
           } else {
@@ -4773,13 +4879,7 @@
             ctx.save();
             ctx.translate(rightCannonX + cannonSize, cannonY);
             ctx.scale(-1, 1);
-            ctx.drawImage(
-              cannonDisplaySprite,
-              0,
-              0,
-              cannonSize,
-              cannonSize
-            );
+            ctx.drawImage(cannonDisplaySprite, 0, 0, cannonSize, cannonSize);
             ctx.restore();
 
             // Draw cannon artifact if placed in cannon display
@@ -4798,23 +4898,23 @@
               const spriteAspectRatio =
                 cannonArtifactSprite.naturalWidth /
                 cannonArtifactSprite.naturalHeight;
-              
+
               let artifactWidth = cannonTileWidth * 1.0; // Use 100% of width (bigger)
               let artifactHeight = artifactWidth / spriteAspectRatio; // Maintain aspect ratio
-              
+
               // If height is too tall, scale down based on height instead
               if (artifactHeight > cannonTileHeight * 0.9) {
                 artifactHeight = cannonTileHeight * 0.9; // Use 90% of height (bigger)
                 artifactWidth = artifactHeight * spriteAspectRatio;
               }
-              
+
               const cannonArtifactX =
                 leftCannonCol * museumTileSize +
                 (cannonTileWidth - artifactWidth) / 2; // Center horizontally
               const cannonArtifactY =
                 cannonRow * museumTileSize +
                 (museumTileSize - artifactHeight) / 2; // Center vertically
-              
+
               ctx.imageSmoothingEnabled = false;
               ctx.drawImage(
                 cannonArtifactSprite,
@@ -4827,18 +4927,8 @@
           } else {
             // Fallback rectangles if the sprite isn't ready yet
             ctx.fillStyle = '#5a5a5a';
-            ctx.fillRect(
-              leftCannonX,
-              cannonY,
-              cannonSize,
-              cannonSize
-            );
-            ctx.fillRect(
-              rightCannonX,
-              cannonY,
-              cannonSize,
-              cannonSize
-            );
+            ctx.fillRect(leftCannonX, cannonY, cannonSize, cannonSize);
+            ctx.fillRect(rightCannonX, cannonY, cannonSize, cannonSize);
           }
 
           // Draw display cases and artifacts
@@ -4846,25 +4936,27 @@
             const displayCase = museum.displayCases[i];
             const caseX = displayCase.col * museumTileSize;
             const caseY = displayCase.row * museumTileSize;
+            const displaySize = Math.round(museumTileSize * 1.1);
+            const displayOffset = (displaySize - museumTileSize) / 2;
 
             // Draw display case sprite
             if (displaySprite.complete && displaySprite.naturalWidth > 0) {
               ctx.drawImage(
                 displaySprite,
-                caseX,
-                caseY,
-                museumTileSize,
-                museumTileSize
+                caseX - displayOffset,
+                caseY - displayOffset,
+                displaySize,
+                displaySize
               );
             } else {
               // Fallback: simple rectangle if sprite not loaded
               ctx.strokeStyle = museum.buildMode ? '#ffff00' : '#888888';
               ctx.lineWidth = 2;
               ctx.strokeRect(
-                caseX + 4,
-                caseY + 4,
-                museumTileSize - 8,
-                museumTileSize - 8
+                caseX + 4 - displayOffset,
+                caseY + 4 - displayOffset,
+                displaySize - 8,
+                displaySize - 8
               );
             }
 
@@ -4874,10 +4966,10 @@
               if (sprite.complete && sprite.naturalWidth > 0) {
                 ctx.drawImage(
                   sprite,
-                  caseX + 4,
-                  caseY + 4,
-                  museumTileSize - 8,
-                  museumTileSize - 8
+                  caseX + 4 - displayOffset,
+                  caseY + 4 - displayOffset,
+                  displaySize - 8,
+                  displaySize - 8
                 );
               }
             }
@@ -5120,7 +5212,10 @@
             ctx.translate(cannonBuffMuseumOffsetX, cannonBuffMuseumOffsetY);
 
             // Draw cannonBuff sprite (same pattern as curator)
-            if (cannonBuffSprite.complete && cannonBuffSprite.naturalWidth > 0) {
+            if (
+              cannonBuffSprite.complete &&
+              cannonBuffSprite.naturalWidth > 0
+            ) {
               const spriteWidth = 43; // Match player size
               const spriteHeight = 43;
 
@@ -5618,64 +5713,95 @@
               ctx.restore();
             }
 
-            // Question mark in bottom left of screen - clickable to show instructions
-            // Check if mouse is hovering over the question mark
-            const questionMarkSize = 28; // Increased from 20 to make question mark bigger
+            // Question mark in bottom left - clickable to show instructions
+            const questionMarkSize = 34; // Slightly bigger for visibility
             const questionMarkX = 15;
             const questionMarkY = canvas.height - 15;
+            const questionMarkPadding = 6;
+            const questionMarkCenterX = questionMarkX + questionMarkSize / 2;
+            const questionMarkCenterY = questionMarkY - questionMarkSize / 2;
+            const questionMarkRadius = questionMarkSize / 2 + 6;
             const isHoveringQuestionMark =
-              mouseX >= questionMarkX - 5 &&
-              mouseX <= questionMarkX + questionMarkSize + 5 &&
-              mouseY >= questionMarkY - questionMarkSize - 5 &&
-              mouseY <= questionMarkY + 5;
+              mouseX >= questionMarkX - questionMarkPadding &&
+              mouseX <=
+                questionMarkX + questionMarkSize + questionMarkPadding &&
+              mouseY >=
+                questionMarkY - questionMarkSize - questionMarkPadding &&
+              mouseY <= questionMarkY + questionMarkPadding;
 
-            // Change color when hovering (like a button)
-            ctx.fillStyle = isHoveringQuestionMark ? '#ffffff' : '#888888';
-            ctx.font = 'bold 28px ui-monospace, Menlo, Consolas, monospace'; // Increased from 20px to make question mark bigger
-            ctx.textAlign = 'left';
-            ctx.textBaseline = 'bottom';
-            ctx.fillText('?', questionMarkX, questionMarkY);
+            // Draw a small badge so the icon is more obvious
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+            ctx.beginPath();
+            ctx.arc(
+              questionMarkCenterX,
+              questionMarkCenterY,
+              questionMarkRadius,
+              0,
+              Math.PI * 2
+            );
+            ctx.fill();
+            ctx.strokeStyle = isHoveringQuestionMark ? '#ffff66' : '#ffffff';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+            // Draw the question mark
+            ctx.fillStyle = isHoveringQuestionMark ? '#ffff66' : '#ffffff';
+            ctx.font = 'bold 32px ui-monospace, Menlo, Consolas, monospace';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('?', questionMarkCenterX, questionMarkCenterY + 1);
 
             // Draw instructions if question mark was clicked
             if (brushingMinigame.showInstructions) {
               // Instructions panel
               const instructionsPanelWidth = 400;
               const instructionsPanelHeight = 200;
-              const instructionsPanelX = (canvas.width - instructionsPanelWidth) / 2;
-              const instructionsPanelY = (canvas.height - instructionsPanelHeight) / 2;
+              const instructionsPanelX =
+                (canvas.width - instructionsPanelWidth) / 2;
+              const instructionsPanelY =
+                (canvas.height - instructionsPanelHeight) / 2;
 
               // Background
               ctx.fillStyle = 'rgba(0, 0, 0, 0.9)';
-              ctx.fillRect(instructionsPanelX, instructionsPanelY, instructionsPanelWidth, instructionsPanelHeight);
+              ctx.fillRect(
+                instructionsPanelX,
+                instructionsPanelY,
+                instructionsPanelWidth,
+                instructionsPanelHeight
+              );
 
               // Border
               ctx.strokeStyle = '#ffffff';
               ctx.lineWidth = 2;
-              ctx.strokeRect(instructionsPanelX, instructionsPanelY, instructionsPanelWidth, instructionsPanelHeight);
+              ctx.strokeRect(
+                instructionsPanelX,
+                instructionsPanelY,
+                instructionsPanelWidth,
+                instructionsPanelHeight
+              );
 
               // Instructions text
               ctx.fillStyle = '#ffffff';
               ctx.font = 'bold 18px ui-monospace, Menlo, Consolas, monospace';
               ctx.textAlign = 'center';
               ctx.textBaseline = 'top';
-              
+
               const instructions = [
                 'Brushing Instructions',
                 '',
                 'Hold SPACE to brush the dirt clean',
                 'Wait for it to turn RED',
                 'Release SPACE quickly when red',
-                'Time it perfect to earn an Artifact!'
+                'Time it perfect to earn an Artifact!',
               ];
 
               let textY = instructionsPanelY + 20;
               for (let i = 0; i < instructions.length; i++) {
-                ctx.font = i === 0 ? 'bold 18px ui-monospace, Menlo, Consolas, monospace' : '14px ui-monospace, Menlo, Consolas, monospace';
-                ctx.fillText(
-                  instructions[i],
-                  canvas.width / 2,
-                  textY
-                );
+                ctx.font =
+                  i === 0
+                    ? 'bold 18px ui-monospace, Menlo, Consolas, monospace'
+                    : '14px ui-monospace, Menlo, Consolas, monospace';
+                ctx.fillText(instructions[i], canvas.width / 2, textY);
                 textY += i === 0 ? 30 : 25; // Extra spacing after title
               }
             }
@@ -5806,7 +5932,8 @@
                 let xPos = rightX;
                 for (let j = 0; j < lineWords.length; j++) {
                   const lineWord = lineWords[j].replace(/[.,;:]/g, '');
-                  const wordText = lineWords[j] + (j < lineWords.length - 1 ? ' ' : '');
+                  const wordText =
+                    lineWords[j] + (j < lineWords.length - 1 ? ' ' : '');
                   if (shouldHighlightTypo && lineWord === typoWord) {
                     ctx.fillStyle = '#ff0000'; // Red for typo
                   } else {
@@ -5826,7 +5953,8 @@
             let xPos = rightX;
             for (let j = 0; j < lineWords.length; j++) {
               const lineWord = lineWords[j].replace(/[.,;:]/g, '');
-              const wordText = lineWords[j] + (j < lineWords.length - 1 ? ' ' : '');
+              const wordText =
+                lineWords[j] + (j < lineWords.length - 1 ? ' ' : '');
               if (shouldHighlightTypo && lineWord === typoWord) {
                 ctx.fillStyle = '#ff0000'; // Red for typo
               } else {
@@ -5945,23 +6073,97 @@
               );
             }
 
-            // Question mark in bottom left of screen (for future use)
-            // Check if mouse is hovering over the question mark
-            const questionMarkSize = 28; // Increased from 20 to make question mark bigger
+            // Question mark in bottom left - clickable to show instructions
+            const questionMarkSize = 34; // Slightly bigger for visibility
             const questionMarkX = 15;
             const questionMarkY = canvas.height - 15;
+            const questionMarkPadding = 6;
+            const questionMarkCenterX = questionMarkX + questionMarkSize / 2;
+            const questionMarkCenterY = questionMarkY - questionMarkSize / 2;
+            const questionMarkRadius = questionMarkSize / 2 + 6;
             const isHoveringQuestionMark =
-              mouseX >= questionMarkX - 5 &&
-              mouseX <= questionMarkX + questionMarkSize + 5 &&
-              mouseY >= questionMarkY - questionMarkSize - 5 &&
-              mouseY <= questionMarkY + 5;
+              mouseX >= questionMarkX - questionMarkPadding &&
+              mouseX <=
+                questionMarkX + questionMarkSize + questionMarkPadding &&
+              mouseY >=
+                questionMarkY - questionMarkSize - questionMarkPadding &&
+              mouseY <= questionMarkY + questionMarkPadding;
 
-            // Change color when hovering (like a button)
-            ctx.fillStyle = isHoveringQuestionMark ? '#ffffff' : '#888888';
-            ctx.font = 'bold 28px ui-monospace, Menlo, Consolas, monospace'; // Increased from 20px to make question mark bigger
-            ctx.textAlign = 'left';
-            ctx.textBaseline = 'bottom';
-            ctx.fillText('?', questionMarkX, questionMarkY);
+            // Draw a small badge so the icon is more obvious
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+            ctx.beginPath();
+            ctx.arc(
+              questionMarkCenterX,
+              questionMarkCenterY,
+              questionMarkRadius,
+              0,
+              Math.PI * 2
+            );
+            ctx.fill();
+            ctx.strokeStyle = isHoveringQuestionMark ? '#ffff66' : '#ffffff';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+            // Draw the question mark
+            ctx.fillStyle = isHoveringQuestionMark ? '#ffff66' : '#ffffff';
+            ctx.font = 'bold 32px ui-monospace, Menlo, Consolas, monospace';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('?', questionMarkCenterX, questionMarkCenterY + 1);
+
+            // Draw instructions if question mark was clicked
+            if (typoMinigame.showInstructions) {
+              const instructionsPanelWidth = 460;
+              const instructionsPanelHeight = 200;
+              const instructionsPanelX =
+                (canvas.width - instructionsPanelWidth) / 2;
+              const instructionsPanelY =
+                (canvas.height - instructionsPanelHeight) / 2;
+
+              // Background
+              ctx.fillStyle = 'rgba(0, 0, 0, 0.9)';
+              ctx.fillRect(
+                instructionsPanelX,
+                instructionsPanelY,
+                instructionsPanelWidth,
+                instructionsPanelHeight
+              );
+
+              // Border
+              ctx.strokeStyle = '#ffffff';
+              ctx.lineWidth = 2;
+              ctx.strokeRect(
+                instructionsPanelX,
+                instructionsPanelY,
+                instructionsPanelWidth,
+                instructionsPanelHeight
+              );
+
+              // Instructions text
+              ctx.fillStyle = '#ffffff';
+              ctx.font = 'bold 18px ui-monospace, Menlo, Consolas, monospace';
+              ctx.textAlign = 'center';
+              ctx.textBaseline = 'top';
+
+              const instructions = [
+                'Typo Instructions',
+                '',
+                'The document on the left is real',
+                'The document on the right may have a typo',
+                'Choose whether to display it or throw it away,',
+                'depending on if you find a typo or not.',
+              ];
+
+              let textY = instructionsPanelY + 20;
+              for (let i = 0; i < instructions.length; i++) {
+                ctx.font =
+                  i === 0
+                    ? 'bold 18px ui-monospace, Menlo, Consolas, monospace'
+                    : '14px ui-monospace, Menlo, Consolas, monospace';
+                ctx.fillText(instructions[i], canvas.width / 2, textY);
+                textY += i === 0 ? 30 : 22;
+              }
+            }
 
             ctx.restore();
           }
@@ -6184,15 +6386,14 @@
               ctx.font = 'bold 24px ui-monospace, Menlo, Consolas, monospace';
               ctx.textAlign = 'center';
               ctx.textBaseline = 'middle';
-              ctx.fillText(
-                'Good job!',
-                canvas.width / 2,
-                panelY + 30
-              );
+              ctx.fillText('Good job!', canvas.width / 2, panelY + 30);
             }
-            
+
             // Display "Oops!" in red when game over (hit a bomb)
-            if (minesweeperMinigame.gameOver && minesweeperMinigame.gameOverMessage) {
+            if (
+              minesweeperMinigame.gameOver &&
+              minesweeperMinigame.gameOverMessage
+            ) {
               ctx.fillStyle = '#ff0000'; // Red color
               ctx.font = 'bold 24px ui-monospace, Menlo, Consolas, monospace';
               ctx.textAlign = 'center';
@@ -6204,64 +6405,95 @@
               );
             }
 
-            // Question mark in bottom left of screen - clickable to show instructions
-            // Check if mouse is hovering over the question mark
-            const questionMarkSize = 28; // Increased from 20 to make question mark bigger
+            // Question mark in bottom left - clickable to show instructions
+            const questionMarkSize = 34; // Slightly bigger for visibility
             const questionMarkX = 15;
             const questionMarkY = canvas.height - 15;
+            const questionMarkPadding = 6;
+            const questionMarkCenterX = questionMarkX + questionMarkSize / 2;
+            const questionMarkCenterY = questionMarkY - questionMarkSize / 2;
+            const questionMarkRadius = questionMarkSize / 2 + 6;
             const isHoveringQuestionMark =
-              mouseX >= questionMarkX - 5 &&
-              mouseX <= questionMarkX + questionMarkSize + 5 &&
-              mouseY >= questionMarkY - questionMarkSize - 5 &&
-              mouseY <= questionMarkY + 5;
+              mouseX >= questionMarkX - questionMarkPadding &&
+              mouseX <=
+                questionMarkX + questionMarkSize + questionMarkPadding &&
+              mouseY >=
+                questionMarkY - questionMarkSize - questionMarkPadding &&
+              mouseY <= questionMarkY + questionMarkPadding;
 
-            // Change color when hovering (like a button)
-            ctx.fillStyle = isHoveringQuestionMark ? '#ffffff' : '#888888';
-            ctx.font = 'bold 28px ui-monospace, Menlo, Consolas, monospace'; // Increased from 20px to make question mark bigger
-            ctx.textAlign = 'left';
-            ctx.textBaseline = 'bottom';
-            ctx.fillText('?', questionMarkX, questionMarkY);
+            // Draw a small badge so the icon is more obvious
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+            ctx.beginPath();
+            ctx.arc(
+              questionMarkCenterX,
+              questionMarkCenterY,
+              questionMarkRadius,
+              0,
+              Math.PI * 2
+            );
+            ctx.fill();
+            ctx.strokeStyle = isHoveringQuestionMark ? '#ffff66' : '#ffffff';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+            // Draw the question mark
+            ctx.fillStyle = isHoveringQuestionMark ? '#ffff66' : '#ffffff';
+            ctx.font = 'bold 32px ui-monospace, Menlo, Consolas, monospace';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('?', questionMarkCenterX, questionMarkCenterY + 1);
 
             // Draw instructions if question mark was clicked
             if (minesweeperMinigame.showInstructions) {
               // Instructions panel
               const instructionsPanelWidth = 400;
               const instructionsPanelHeight = 200;
-              const instructionsPanelX = (canvas.width - instructionsPanelWidth) / 2;
-              const instructionsPanelY = (canvas.height - instructionsPanelHeight) / 2;
+              const instructionsPanelX =
+                (canvas.width - instructionsPanelWidth) / 2;
+              const instructionsPanelY =
+                (canvas.height - instructionsPanelHeight) / 2;
 
               // Background
               ctx.fillStyle = 'rgba(0, 0, 0, 0.9)';
-              ctx.fillRect(instructionsPanelX, instructionsPanelY, instructionsPanelWidth, instructionsPanelHeight);
+              ctx.fillRect(
+                instructionsPanelX,
+                instructionsPanelY,
+                instructionsPanelWidth,
+                instructionsPanelHeight
+              );
 
               // Border
               ctx.strokeStyle = '#ffffff';
               ctx.lineWidth = 2;
-              ctx.strokeRect(instructionsPanelX, instructionsPanelY, instructionsPanelWidth, instructionsPanelHeight);
+              ctx.strokeRect(
+                instructionsPanelX,
+                instructionsPanelY,
+                instructionsPanelWidth,
+                instructionsPanelHeight
+              );
 
               // Instructions text
               ctx.fillStyle = '#ffffff';
               ctx.font = 'bold 18px ui-monospace, Menlo, Consolas, monospace';
               ctx.textAlign = 'center';
               ctx.textBaseline = 'top';
-              
+
               const instructions = [
                 'Minesweeper Instructions',
                 '',
                 'Left click to reveal tiles',
                 'Right click to flag mines',
                 'Numbers show adjacent mines',
-                'Reveal all safe tiles to win!'
+                'Reveal all safe tiles to win!',
               ];
 
               let textY = instructionsPanelY + 20;
               for (let i = 0; i < instructions.length; i++) {
-                ctx.font = i === 0 ? 'bold 18px ui-monospace, Menlo, Consolas, monospace' : '14px ui-monospace, Menlo, Consolas, monospace';
-                ctx.fillText(
-                  instructions[i],
-                  canvas.width / 2,
-                  textY
-                );
+                ctx.font =
+                  i === 0
+                    ? 'bold 18px ui-monospace, Menlo, Consolas, monospace'
+                    : '14px ui-monospace, Menlo, Consolas, monospace';
+                ctx.fillText(instructions[i], canvas.width / 2, textY);
                 textY += i === 0 ? 30 : 25; // Extra spacing after title
               }
             }
@@ -6613,7 +6845,11 @@
             ? systemMessage.text
             : tutorial.active
             ? tutorial.dialogue
-            : oldGuy.dialogue || joseph.dialogue || curator.dialogue || cannonBuff.dialogue || '';
+            : oldGuy.dialogue ||
+              joseph.dialogue ||
+              curator.dialogue ||
+              cannonBuff.dialogue ||
+              '';
           const words = dialogueText.split(' ');
           let line = '';
           // Start text below character name and line (add extra space if name exists)
@@ -6811,9 +7047,9 @@
                   spriteSize
                 );
                 ctx.restore();
-                  ctx.textBaseline = 'bottom';
-                  // Draw with shadow for readability
-                  ctx.shadowColor = 'rgba(0, 0, 0, 0.8)';
+                ctx.textBaseline = 'bottom';
+                // Draw with shadow for readability
+                ctx.shadowColor = 'rgba(0, 0, 0, 0.8)';
               }
             }
           }
@@ -6869,22 +7105,22 @@
                 ) {
                   ctx.save();
                   ctx.imageSmoothingEnabled = false;
-                  
+
                   // Special handling for Cannon - make it bigger and preserve aspect ratio
                   if (item.name === 'Cannon') {
                     const spriteAspectRatio =
                       item.sprite.naturalWidth / item.sprite.naturalHeight;
                     const maxSize = slotSize - 4; // Use more of the slot
-                    
+
                     let spriteWidth = maxSize;
                     let spriteHeight = spriteWidth / spriteAspectRatio;
-                    
+
                     // If height is too tall, scale down based on height instead
                     if (spriteHeight > maxSize) {
                       spriteHeight = maxSize;
                       spriteWidth = spriteHeight * spriteAspectRatio;
                     }
-                    
+
                     const spriteX = slotX + (slotSize - spriteWidth) / 2;
                     const spriteY = slotY + (slotSize - spriteHeight) / 2;
                     ctx.drawImage(
@@ -6919,14 +7155,19 @@
                     // Add tier label for artifacts (ex: "Rusty Nails (common)")
                     const tierLabel = item.tier ? ` (${item.tier})` : '';
                     description = item.name + tierLabel;
-                    
+
                     // Store tier color for artifacts
                     if (item.type === 'artifact' && item.tier) {
-                      if (item.tier === 'common') hoveredItemTierColor = '#9b9b9b'; // Gray
-                      else if (item.tier === 'uncommon') hoveredItemTierColor = '#7dff8a'; // Light green
-                      else if (item.tier === 'rare') hoveredItemTierColor = '#7dc7ff'; // Light blue
-                      else if (item.tier === 'super rare') hoveredItemTierColor = '#00008b'; // Dark blue
-                      else if (item.tier === 'legendary') hoveredItemTierColor = '#ffd700'; // Gold
+                      if (item.tier === 'common')
+                        hoveredItemTierColor = '#9b9b9b'; // Gray
+                      else if (item.tier === 'uncommon')
+                        hoveredItemTierColor = '#7dff8a'; // Light green
+                      else if (item.tier === 'rare')
+                        hoveredItemTierColor = '#7dc7ff'; // Light blue
+                      else if (item.tier === 'super rare')
+                        hoveredItemTierColor = '#00008b'; // Dark blue
+                      else if (item.tier === 'legendary')
+                        hoveredItemTierColor = '#ffd700'; // Gold
                     }
                   }
                   if (!hoveredItemDescription) {
@@ -6941,15 +7182,19 @@
                 if (item.tier === 'common') outlineColor = '#9b9b9b'; // Gray
                 else if (item.tier === 'uncommon')
                   outlineColor = '#7dff8a'; // Light green
-                else if (item.tier === 'rare') outlineColor = '#7dc7ff'; // Light blue
+                else if (item.tier === 'rare')
+                  outlineColor = '#7dc7ff'; // Light blue
                 else if (item.tier === 'super rare')
                   outlineColor = '#00008b'; // Dark blue for super rare
-                else if (item.tier === 'legendary')
-                  outlineColor = '#ffd700'; // Gold for legendary
+                else if (item.tier === 'legendary') outlineColor = '#ffd700'; // Gold for legendary
               }
-              
+
               // Highlight selected artifact for deletion
-              if (inventory.selectedSlotIndex === slotIndex && item && item.type === 'artifact') {
+              if (
+                inventory.selectedSlotIndex === slotIndex &&
+                item &&
+                item.type === 'artifact'
+              ) {
                 // Draw red highlight border for selected artifact
                 ctx.strokeStyle = '#ff0000'; // Red
                 ctx.lineWidth = 3;
@@ -6960,7 +7205,7 @@
                   slotSize + 4
                 );
               }
-              
+
               // Highlight eligible artifacts when selecting for Joseph
               if (
                 joseph.selectingArtifact &&
@@ -6981,7 +7226,7 @@
                   slotSize + 4
                 );
               }
-              
+
               ctx.strokeStyle = outlineColor;
               ctx.lineWidth = 1.5;
               ctx.stroke();
@@ -7041,27 +7286,43 @@
           const deleteButtonSize = 40;
           const deleteButtonX = panelX + inventoryWidth + 20; // 20px spacing from inventory
           const deleteButtonY = panelY + titleHeight; // Align with top of artifact slots
-          
+
           // Check if hovering over delete button
           const isHoveringDelete =
             mouseX >= deleteButtonX &&
             mouseX <= deleteButtonX + deleteButtonSize &&
             mouseY >= deleteButtonY &&
             mouseY <= deleteButtonY + deleteButtonSize;
-          
+
           // Draw delete button background
-          ctx.fillStyle = isHoveringDelete ? 'rgba(255, 0, 0, 0.8)' : 'rgba(200, 0, 0, 0.6)';
-          ctx.fillRect(deleteButtonX, deleteButtonY, deleteButtonSize, deleteButtonSize);
-          
+          ctx.fillStyle = isHoveringDelete
+            ? 'rgba(255, 0, 0, 0.8)'
+            : 'rgba(200, 0, 0, 0.6)';
+          ctx.fillRect(
+            deleteButtonX,
+            deleteButtonY,
+            deleteButtonSize,
+            deleteButtonSize
+          );
+
           // Draw red X
           ctx.strokeStyle = '#ffffff';
           ctx.lineWidth = 3;
           ctx.beginPath();
           const xPadding = 8;
           ctx.moveTo(deleteButtonX + xPadding, deleteButtonY + xPadding);
-          ctx.lineTo(deleteButtonX + deleteButtonSize - xPadding, deleteButtonY + deleteButtonSize - xPadding);
-          ctx.moveTo(deleteButtonX + deleteButtonSize - xPadding, deleteButtonY + xPadding);
-          ctx.lineTo(deleteButtonX + xPadding, deleteButtonY + deleteButtonSize - xPadding);
+          ctx.lineTo(
+            deleteButtonX + deleteButtonSize - xPadding,
+            deleteButtonY + deleteButtonSize - xPadding
+          );
+          ctx.moveTo(
+            deleteButtonX + deleteButtonSize - xPadding,
+            deleteButtonY + xPadding
+          );
+          ctx.lineTo(
+            deleteButtonX + xPadding,
+            deleteButtonY + deleteButtonSize - xPadding
+          );
           ctx.stroke();
 
           // Instructions
@@ -7161,16 +7422,19 @@
           const museumArtifacts = museum.displayCases
             .filter((displayCase) => displayCase.artifact)
             .map((displayCase) => displayCase.artifact);
-          
+
           // Check if cannon is placed
-          const hasCannon = museum.cannonDisplay && museum.cannonDisplay.artifact && museum.cannonDisplay.artifact.name === 'Cannon';
-          
+          const hasCannon =
+            museum.cannonDisplay &&
+            museum.cannonDisplay.artifact &&
+            museum.cannonDisplay.artifact.name === 'Cannon';
+
           // Check if player has radar
           const hasRadar = radar.active;
-          
+
           // Count total artifacts in museum (including cannon)
           const totalArtifacts = museumArtifacts.length + (hasCannon ? 1 : 0);
-          
+
           // Check if player has nothing (no artifacts, no items)
           if (totalArtifacts === 0 && !hasRadar) {
             return {
@@ -7178,24 +7442,27 @@
               reason: 'You did nothing, no artifacts, no items.',
             };
           }
-          
+
           // Get all artifact names in museum (excluding cannon, which is separate)
           const museumNames = new Set(
             museumArtifacts.map((artifact) => artifact.name)
           );
-          
+
           // Check if has all artifacts except cannon
-          const artifactsWithoutCannon = ARTIFACT_NAMES.filter(name => name !== 'Cannon');
-          const hasAllArtifactsMinusCannon = artifactsWithoutCannon.every((name) =>
-            museumNames.has(name)
+          const artifactsWithoutCannon = ARTIFACT_NAMES.filter(
+            (name) => name !== 'Cannon'
           );
-          
+          const hasAllArtifactsMinusCannon = artifactsWithoutCannon.every(
+            (name) => museumNames.has(name)
+          );
+
           // Check if has all artifacts including cannon
-          const hasAllArtifactsWithCannon = hasAllArtifactsMinusCannon && hasCannon;
-          
+          const hasAllArtifactsWithCannon =
+            hasAllArtifactsMinusCannon && hasCannon;
+
           // Check if museum is full
           const isFull = filledCases === totalCases && hasCannon;
-          
+
           // Legendary: Every artifact + cannon + radar
           if (hasAllArtifactsWithCannon && hasRadar) {
             return {
@@ -7203,7 +7470,7 @@
               reason: 'Every artifact + cannon + radar.',
             };
           }
-          
+
           // Above average: Every artifact + cannon
           if (hasAllArtifactsWithCannon) {
             return {
@@ -7211,7 +7478,7 @@
               reason: 'Every artifact + Cannon.',
             };
           }
-          
+
           // Average: One of every artifact, minus cannon
           if (hasAllArtifactsMinusCannon) {
             return {
@@ -7219,7 +7486,7 @@
               reason: 'One of every artifact, minus cannon.',
             };
           }
-          
+
           // Below average: Any amount of artifacts below the max
           return {
             name: 'Below Average',
@@ -7306,7 +7573,8 @@
             if (item.tier === 'common') outlineColor = '#9b9b9b';
             else if (item.tier === 'uncommon') outlineColor = '#7dff8a';
             else if (item.tier === 'rare') outlineColor = '#7dc7ff';
-            else if (item.tier === 'super rare') outlineColor = '#00008b'; // Dark blue for super rare
+            else if (item.tier === 'super rare')
+              outlineColor = '#00008b'; // Dark blue for super rare
             else if (item.tier === 'legendary') outlineColor = '#ffd700'; // Gold for legendary
             ctx.strokeStyle = outlineColor;
             ctx.lineWidth = 1.5;
@@ -7332,22 +7600,22 @@
             ) {
               ctx.save();
               ctx.imageSmoothingEnabled = false;
-              
+
               // Special handling for Cannon - make it bigger and preserve aspect ratio
               if (item.name === 'Cannon') {
                 const spriteAspectRatio =
                   item.sprite.naturalWidth / item.sprite.naturalHeight;
                 const maxSize = layout.slotSize - 2; // Use more of the slot
-                
+
                 let spriteWidth = maxSize;
                 let spriteHeight = spriteWidth / spriteAspectRatio;
-                
+
                 // If height is too tall, scale down based on height instead
                 if (spriteHeight > maxSize) {
                   spriteHeight = maxSize;
                   spriteWidth = spriteHeight * spriteAspectRatio;
                 }
-                
+
                 const spriteX = slotX + (layout.slotSize - spriteWidth) / 2;
                 const spriteY = slotY + (layout.slotSize - spriteHeight) / 2;
                 ctx.drawImage(
@@ -7382,14 +7650,19 @@
             if (isHovered && !hoveredItemDescription) {
               const tierLabel = item.tier ? ` (${item.tier})` : '';
               hoveredItemDescription = item.name + tierLabel;
-              
+
               // Store tier color for artifacts
               if (item.tier) {
-                if (item.tier === 'common') hoveredItemTierColor = '#9b9b9b'; // Gray
-                else if (item.tier === 'uncommon') hoveredItemTierColor = '#7dff8a'; // Light green
-                else if (item.tier === 'rare') hoveredItemTierColor = '#7dc7ff'; // Light blue
-                else if (item.tier === 'super rare') hoveredItemTierColor = '#00008b'; // Dark blue
-                else if (item.tier === 'legendary') hoveredItemTierColor = '#ffd700'; // Gold
+                if (item.tier === 'common')
+                  hoveredItemTierColor = '#9b9b9b'; // Gray
+                else if (item.tier === 'uncommon')
+                  hoveredItemTierColor = '#7dff8a'; // Light green
+                else if (item.tier === 'rare')
+                  hoveredItemTierColor = '#7dc7ff'; // Light blue
+                else if (item.tier === 'super rare')
+                  hoveredItemTierColor = '#00008b'; // Dark blue
+                else if (item.tier === 'legendary')
+                  hoveredItemTierColor = '#ffd700'; // Gold
               }
             }
           }
@@ -7439,29 +7712,47 @@
 
           // Red X button for deleting artifacts (bottom right of panel)
           const deleteButtonSize = 32;
-          const deleteButtonX = layout.panelX + layout.panelWidth - deleteButtonSize - 8; // 8px from right edge
-          const deleteButtonY = layout.panelY + layout.panelHeight - deleteButtonSize - 8; // 8px from bottom edge
-          
+          const deleteButtonX =
+            layout.panelX + layout.panelWidth - deleteButtonSize - 8; // 8px from right edge
+          const deleteButtonY =
+            layout.panelY + layout.panelHeight - deleteButtonSize - 8; // 8px from bottom edge
+
           // Check if hovering over delete button
           const isHoveringDelete =
             mouseX >= deleteButtonX &&
             mouseX <= deleteButtonX + deleteButtonSize &&
             mouseY >= deleteButtonY &&
             mouseY <= deleteButtonY + deleteButtonSize;
-          
+
           // Draw delete button background
-          ctx.fillStyle = isHoveringDelete ? 'rgba(255, 0, 0, 0.8)' : 'rgba(200, 0, 0, 0.6)';
-          ctx.fillRect(deleteButtonX, deleteButtonY, deleteButtonSize, deleteButtonSize);
-          
+          ctx.fillStyle = isHoveringDelete
+            ? 'rgba(255, 0, 0, 0.8)'
+            : 'rgba(200, 0, 0, 0.6)';
+          ctx.fillRect(
+            deleteButtonX,
+            deleteButtonY,
+            deleteButtonSize,
+            deleteButtonSize
+          );
+
           // Draw red X
           ctx.strokeStyle = '#ffffff';
           ctx.lineWidth = 2.5;
           ctx.beginPath();
           const xPadding = 6;
           ctx.moveTo(deleteButtonX + xPadding, deleteButtonY + xPadding);
-          ctx.lineTo(deleteButtonX + deleteButtonSize - xPadding, deleteButtonY + deleteButtonSize - xPadding);
-          ctx.moveTo(deleteButtonX + deleteButtonSize - xPadding, deleteButtonY + xPadding);
-          ctx.lineTo(deleteButtonX + xPadding, deleteButtonY + deleteButtonSize - xPadding);
+          ctx.lineTo(
+            deleteButtonX + deleteButtonSize - xPadding,
+            deleteButtonY + deleteButtonSize - xPadding
+          );
+          ctx.moveTo(
+            deleteButtonX + deleteButtonSize - xPadding,
+            deleteButtonY + xPadding
+          );
+          ctx.lineTo(
+            deleteButtonX + xPadding,
+            deleteButtonY + deleteButtonSize - xPadding
+          );
           ctx.stroke();
 
           ctx.restore();
@@ -7604,31 +7895,24 @@
           ctx.font = 'bold 36px ui-monospace, Menlo, Consolas, monospace';
           ctx.textAlign = 'center';
           ctx.textBaseline = 'middle';
-          ctx.fillText(
-            'Controls',
-            canvas.width / 2,
-            canvas.height / 2 - 120
-          );
+          ctx.fillText('Controls', canvas.width / 2, canvas.height / 2 - 120);
 
           // Controls text
           ctx.fillStyle = '#ffffff';
           ctx.font = '20px ui-monospace, Menlo, Consolas, monospace';
           ctx.textAlign = 'center';
           ctx.textBaseline = 'middle';
-          
+
           const controlsText = [
             'WASD or Arrow keys to move',
+            'Hold Shift to sprint',
             'Space to interact',
-            'E to open inventory'
+            'E to open inventory',
           ];
 
           let textY = canvas.height / 2 - 40;
           for (let i = 0; i < controlsText.length; i++) {
-            ctx.fillText(
-              controlsText[i],
-              canvas.width / 2,
-              textY
-            );
+            ctx.fillText(controlsText[i], canvas.width / 2, textY);
             textY += 35; // Spacing between lines
           }
 
