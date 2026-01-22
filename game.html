@@ -17,23 +17,8 @@
       }
       .wrap {
         display: grid;
-        grid-template-rows: auto 1fr auto;
+        grid-template-rows: 1fr;
         min-height: 100%;
-      }
-      header,
-      footer {
-        padding: 6px 14px;
-        background: #15193a;
-        border-bottom: 1px solid #2b2f55;
-      }
-      header {
-        position: sticky;
-        top: 0;
-        z-index: 1;
-      }
-      footer {
-        border-top: 1px solid #2b2f55;
-        border-bottom: none;
       }
       main {
         display: grid;
@@ -72,9 +57,6 @@
   </head>
   <body>
     <div class="wrap">
-      <header>
-        <strong>Dig, Dig, Dig!</strong>
-      </header>
       <main>
         <canvas
           id="game"
@@ -121,8 +103,12 @@
           speed: 0.3, // radians per second (slow, smooth rotation)
         };
 
-        // Game state: 'loading', 'title', 'controls', 'playing', 'dayEnd', 'museum', or 'weekEnd'
+        // Game state: 'loading', 'title', 'controls', 'starting', 'playing',
+        // 'dayEnd', 'museum', or 'weekEnd'
         let gameState = 'loading';
+
+        // Start-game flow: queue heavy setup so input feels instant
+        let startGamePending = false;
 
         // Loading screen facts - random facts shown while loading
         // These help entertain the player during asset loading
@@ -548,11 +534,6 @@
         speedBrushSprite.imageSmoothingEnabled = false;
         speedBrushSprite.src = 'assets/sprites/Speed_Brush.png';
 
-        // Candy Kid sprite (kept for potential future use)
-        // const candyKidSprite = new Image();
-        // candyKidSprite.imageSmoothingEnabled = false;
-        // candyKidSprite.src = 'assets/sprites/Candy_Kid.png';
-
         const dirtSprite = new Image();
         dirtSprite.imageSmoothingEnabled = false;
         dirtSprite.src = 'assets/sprites/dirt.png';
@@ -707,11 +688,6 @@
         const cannonBuffSprite = new Image();
         cannonBuffSprite.imageSmoothingEnabled = false;
         cannonBuffSprite.src = 'assets/sprites/Cannon_buff.png';
-
-        // Vending Machine sprite (kept for potential future use)
-        // const vendingMachineSprite = new Image();
-        // vendingMachineSprite.imageSmoothingEnabled = false;
-        // vendingMachineSprite.src = 'assets/sprites/Vending_Machine.png';
 
         // Minigame reward sprites
         const bulletsSprite = new Image();
@@ -1258,6 +1234,45 @@
         const keyJustPressed = Object.create(null); // Track keys that were just pressed this frame
         const pressed = (code) => keys[code] === true;
 
+        // Start a fresh game after the controls screen
+        // Kept in a function so we can run it after the controls screen closes
+        function startNewGameFromControls() {
+          // Initialize day/time system for new game
+          dayTime.currentDay = 0; // Start on Monday
+          dayTime.currentHour = 8; // Start at start of Monday (8 AM)
+          dayTime.hourTimer = 0;
+
+          // Reset player position
+          player.x = world.width / 2;
+          player.y = world.height - 40;
+          player.vx = 0;
+          player.vy = 0;
+
+          // Reset camera
+          camera.x = player.x;
+          camera.y = player.y;
+
+          // Regenerate tiles (randomize X's) and ensure sprites are loaded
+          tileMap = generateTiles();
+          tileRegenerationScheduled = false; // Reset flag to allow regeneration
+          // Force immediate regeneration to ensure all sprite-based tiles render
+          doRegenerateTiles(); // Call directly to ensure it happens synchronously
+
+          // Reset museum state
+          museum.doorPrompt = false;
+          museum.wasNearDoor = false;
+          museum.buildMode = false;
+          museum.cannonDisplay = null;
+          museum.displayCases = [];
+          museum.hasInitializedDisplays = false;
+
+          // Reset game over state
+          gameOver.active = false;
+
+          // Start the game
+          gameState = 'playing';
+        }
+
         window.addEventListener(
           'keydown',
           (e) => {
@@ -1477,39 +1492,10 @@
               keyJustPressed['Space']
             ) {
               e.preventDefault();
-              // Initialize day/time system for new game
-              dayTime.currentDay = 0; // Start on Monday
-              dayTime.currentHour = 8; // Start at start of Monday (8 AM)
-              dayTime.hourTimer = 0;
-
-              // Reset player position
-              player.x = world.width / 2;
-              player.y = world.height - 40;
-              player.vx = 0;
-              player.vy = 0;
-
-              // Reset camera
-              camera.x = player.x;
-              camera.y = player.y;
-
-              // Regenerate tiles (randomize X's) and ensure sprites are loaded
-              tileMap = generateTiles();
-              tileRegenerationScheduled = false; // Reset flag to allow regeneration
-              // Force immediate regeneration to ensure all sprite-based tiles are properly rendered
-              doRegenerateTiles(); // Call directly to ensure it happens synchronously
-
-              // Reset museum state
-              museum.doorPrompt = false;
-              museum.wasNearDoor = false;
-              museum.buildMode = false;
-              museum.cannonDisplay = null;
-              museum.displayCases = [];
-              museum.hasInitializedDisplays = false;
-
-              // Reset game over state
-              gameOver.active = false;
-
-              gameState = 'playing';
+              // Switch to a lightweight "starting" screen immediately
+              // Heavy setup runs after the screen updates (feels snappier)
+              gameState = 'starting';
+              startGamePending = true;
               return;
             }
 
@@ -2786,52 +2772,6 @@
           updateMinesweeperMinigame(dtMs);
           updateTypoMinigame(dtMs);
           updateRadar(dtMs);
-        }
-
-        function drawGrid() {
-          // Performance: Only draw grid if visible (optional - can be disabled entirely if still laggy)
-          // For now, keeping it but optimizing viewport calculations
-          const step = 50;
-          ctx.save();
-          ctx.lineWidth = 1;
-
-          // Viewport culling: only draw grid lines visible on screen
-          const halfCanvasW = canvas.width / 2;
-          const halfCanvasH = canvas.height / 2;
-          const viewLeft = camera.x - halfCanvasW;
-          const viewTop = camera.y - halfCanvasH;
-          const viewRight = camera.x + halfCanvasW;
-          const viewBottom = camera.y + halfCanvasH;
-
-          const startX = Math.max(0, Math.floor(viewLeft / step) * step);
-          const endX = Math.min(
-            world.width,
-            Math.ceil(viewRight / step) * step
-          );
-          const startY = Math.max(0, Math.floor(viewTop / step) * step);
-          const endY = Math.min(
-            world.height,
-            Math.ceil(viewBottom / step) * step
-          );
-
-          // Batch strokes by color to reduce state changes
-          for (let x = startX; x <= endX; x += step) {
-            ctx.strokeStyle =
-              x % 200 === 0 ? 'rgba(139,111,71,0.18)' : 'rgba(139,111,71,0.08)'; // Brown grid
-            ctx.beginPath();
-            ctx.moveTo(x + 0.5, viewTop);
-            ctx.lineTo(x + 0.5, viewBottom);
-            ctx.stroke();
-          }
-          for (let y = startY; y <= endY; y += step) {
-            ctx.strokeStyle =
-              y % 200 === 0 ? 'rgba(139,111,71,0.18)' : 'rgba(139,111,71,0.08)'; // Brown grid
-            ctx.beginPath();
-            ctx.moveTo(viewLeft, y + 0.5);
-            ctx.lineTo(viewRight, y + 0.5);
-            ctx.stroke();
-          }
-          ctx.restore();
         }
 
         function drawTiles() {
@@ -4368,7 +4308,6 @@
         allSprites = [
           brushSprite,
           speedBrushSprite,
-          // candyKidSprite, // Removed - NPC not in use
           dirtSprite,
           grassSprite,
           flowerSprite,
@@ -4381,7 +4320,6 @@
           shopkeeperSprite,
           curatorSprite,
           cannonBuffSprite,
-          // vendingMachineSprite, // Removed - NPC not in use
           quickShoesSprite,
           buttonsSprite,
           bulletsSprite,
@@ -5077,9 +5015,7 @@
         }
 
         function render() {
-          ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-          // Fill canvas with world background color to prevent CSS background showing through
+          // A full-screen fill clears the previous frame more efficiently than clearRect
           ctx.fillStyle = world.bg;
           ctx.fillRect(0, 0, canvas.width, canvas.height);
 
@@ -5314,7 +5250,6 @@
           );
 
           drawTiles();
-          drawGrid();
           drawFlora();
 
           // Old Guy NPC
@@ -7801,7 +7736,6 @@
 
           // Draw background elements only
           drawTiles();
-          drawGrid();
           drawFlora();
 
           ctx.restore();
@@ -7889,6 +7823,22 @@
             canvas.width / 2,
             canvas.height - 20
           );
+        }
+
+        // Starting screen rendering (shown while heavy setup runs)
+        function drawStartingScreen() {
+          // Simple screen so the player sees instant feedback on Space
+          ctx.fillStyle = world.bg;
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+          ctx.fillStyle = 'rgba(15, 26, 18, 0.9)';
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+          ctx.fillStyle = '#e8eaf6';
+          ctx.font = 'bold 32px ui-monospace, Menlo, Consolas, monospace';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText('Starting game...', canvas.width / 2, canvas.height / 2);
         }
 
         // Controls screen rendering
@@ -8005,6 +7955,15 @@
             } else if (gameState === 'controls') {
               // Draw controls screen
               drawControlsScreen();
+            } else if (gameState === 'starting') {
+              // Show a quick transition screen while heavy setup runs
+              drawStartingScreen();
+
+              if (startGamePending) {
+                startGamePending = false;
+                // Defer the heavy setup so the screen can render first
+                setTimeout(startNewGameFromControls, 0);
+              }
             } else {
               update(dt);
               render();
