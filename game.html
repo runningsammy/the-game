@@ -445,6 +445,7 @@
           broken: false,
           isSecretX: false, // Track if this minigame came from a secret X tile
           showInstructions: false, // Track if question mark was clicked to show instructions
+          hasStartedFirstTime: false, // Track if this minigame type has been started before
         };
 
         const minesweeperMinigame = {
@@ -464,6 +465,7 @@
           isSecretX: false,
           baseReward: 10,
           showInstructions: false, // Track if question mark was clicked to show instructions
+          hasStartedFirstTime: false, // Track if this minigame type has been started before
         };
 
         // Typo minigame documents with their possible typos
@@ -522,6 +524,7 @@
           isSecretX: false, // Track if this minigame came from a secret X tile
           selectedTypo: null, // Store which typo was selected for highlighting
           showInstructions: false, // Track if question mark was clicked
+          hasStartedFirstTime: false, // Track if this minigame type has been started before
         };
 
         // Optimize sprite loading: set imageSmoothingEnabled before src for faster rendering
@@ -3637,6 +3640,11 @@
             brushingMinigame.dirtLevel = 1.0;
             brushingMinigame.redness = 0;
             brushingMinigame.timeHoldingSpace = 0;
+            // Show instructions automatically on first time
+            if (!brushingMinigame.hasStartedFirstTime) {
+              brushingMinigame.showInstructions = true;
+              brushingMinigame.hasStartedFirstTime = true;
+            }
             // Check if player has speed brush (equipment slot only)
             const hasSpeedBrush = inventory.speedBrush;
             // Speed brush: red trigger time is 2-4 seconds (instead of 3-8)
@@ -3667,6 +3675,11 @@
             minesweeperMinigame.gameOverMessage = null;
             minesweeperMinigame.firstClick = true;
             minesweeperMinigame.clickCount = 0; // Reset click count for new game
+            // Show instructions automatically on first time
+            if (!minesweeperMinigame.hasStartedFirstTime) {
+              minesweeperMinigame.showInstructions = true;
+              minesweeperMinigame.hasStartedFirstTime = true;
+            }
 
             // Initialize empty grids
             const size = minesweeperMinigame.gridSize;
@@ -3693,6 +3706,11 @@
             typoMinigame.tileCol = col;
             typoMinigame.isSecretX = crouchAnimation.isSecretX;
             typoMinigame.answered = false;
+            // Show instructions automatically on first time
+            if (!typoMinigame.hasStartedFirstTime) {
+              typoMinigame.showInstructions = true;
+              typoMinigame.hasStartedFirstTime = true;
+            }
 
             // Randomly select a document
             const selectedDocument =
@@ -7862,28 +7880,28 @@
 
           // Controls text
           ctx.fillStyle = '#ffffff';
-          ctx.font = '20px ui-monospace, Menlo, Consolas, monospace';
+          ctx.font = '16px ui-monospace, Menlo, Consolas, monospace';
           ctx.textAlign = 'center';
           ctx.textBaseline = 'middle';
-
+          
           const controlsText = [
-            'WASD or Arrow keys to move',
-            'Hold Shift to sprint',
-            'Space to interact',
-            'E to open inventory',
+            'Use the WASD keys or the Arrow keys on your keyboard to move',
+            'Press the space button when close to a person to talk to them',
+            'Hold down the shift key to move faster. Keep an eye on your stamina on the top left!',
+            'Press E to open your inventory to check your artifacts',
           ];
-
+          
           let textY = canvas.height / 2 - 40;
           for (let i = 0; i < controlsText.length; i++) {
             ctx.fillText(controlsText[i], canvas.width / 2, textY);
-            textY += 35; // Spacing between lines
+            textY += 30; // Spacing between lines (reduced from 35)
           }
 
           // Continue instruction
           ctx.fillStyle = '#e8eaf6';
           ctx.font = 'bold 18px ui-monospace, Menlo, Consolas, monospace';
           ctx.fillText(
-            'Press SPACE to continue',
+            'Press space to continue to the game',
             canvas.width / 2,
             canvas.height / 2 + 100
           );
