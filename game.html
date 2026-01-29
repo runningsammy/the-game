@@ -318,10 +318,19 @@
         const cellsPerTile = tileSize / tileCell;
 
         // NPC spawn points (used for both NPC placement and X spawn safety)
+        // We keep these near the center so the player meets key characters quickly.
         const npcSpawnPoints = {
           oldGuy: {
             x: world.width / 2 + 150, // To the right of spawn
             y: world.height - 40, // Same Y as spawn
+            radius: 20,
+          },
+          warningGuy: {
+            // New NPC: stands to the LEFT of spawn, mirroring oldGuy.
+            // Because world.width/2 is the horizontal center, subtracting
+            // moves him left, adding moves right.
+            x: world.width / 2 - 150,
+            y: world.height - 40,
             radius: 20,
           },
           joseph: {
@@ -680,6 +689,13 @@
         oldGuySprite.imageSmoothingEnabled = false;
         oldGuySprite.src = 'assets/sprites/oldguy.png';
 
+        // Warning Guy NPC sprite (new character on the left of spawn)
+        const warningGuySprite = new Image();
+        warningGuySprite.imageSmoothingEnabled = false;
+        // Note: the actual file in assets is named "Warning_guy.png.png"
+        // so we point directly to that filename here.
+        warningGuySprite.src = 'assets/sprites/Warning_guy.png.png';
+
         const shopkeeperSprite = new Image();
         shopkeeperSprite.imageSmoothingEnabled = false;
         shopkeeperSprite.src = 'assets/sprites/shopkeeper.png';
@@ -704,6 +720,10 @@
         const rustyNailsSprite = new Image();
         rustyNailsSprite.imageSmoothingEnabled = false;
         rustyNailsSprite.src = 'assets/sprites/Rusty_Nails.png';
+
+        const forkSprite = new Image();
+        forkSprite.imageSmoothingEnabled = false;
+        forkSprite.src = 'assets/sprites/Fork.png';
 
         const pinSprite = new Image();
         pinSprite.imageSmoothingEnabled = false;
@@ -1190,6 +1210,16 @@
           hasCompletedIntro: false, // Track if player has completed initial dialogue sequence
         };
 
+        // Warning Guy NPC (positioned to the left of spawn)
+        const warningGuy = {
+          x: npcSpawnPoints.warningGuy.x,
+          y: npcSpawnPoints.warningGuy.y,
+          radius: npcSpawnPoints.warningGuy.radius,
+          dialogue: null, // Current dialogue text
+          dialogueStage: 0, // 0-3 for first conversation, 1 for repeat line
+          hasCompletedIntro: false, // After first full conversation
+        };
+
         // Joseph NPC (shopkeeper with radar, positioned centrally)
         const joseph = {
           x: npcSpawnPoints.joseph.x,
@@ -1260,6 +1290,11 @@
           tileRegenerationScheduled = false; // Reset flag to allow regeneration
           // Force immediate regeneration to ensure all sprite-based tiles render
           doRegenerateTiles(); // Call directly to ensure it happens synchronously
+
+          // Also reset radar discoveries when starting a completely new game.
+          // This prevents old yellow X markers from carrying over between runs.
+          radar.discoveredSecretX = [];
+          radar.rings = [];
 
           // Reset museum state
           museum.doorPrompt = false;
@@ -1353,6 +1388,7 @@
               if (
                 systemMessage.text ||
                 oldGuy.dialogue ||
+                warningGuy.dialogue ||
                 joseph.dialogue ||
                 curator.dialogue ||
                 cannonBuff.dialogue
@@ -1362,6 +1398,10 @@
                   systemMessage.text = null;
                 } else if (oldGuy.dialogue) {
                   advanceOldGuyDialogue(); // Advance through dialogue stages
+                  player.vx = 0;
+                  player.vy = 0;
+                } else if (warningGuy.dialogue) {
+                  advanceWarningGuyDialogue();
                   player.vx = 0;
                   player.vy = 0;
                 } else if (joseph.dialogue) {
@@ -1612,6 +1652,14 @@
         canvas.addEventListener('click', (e) => {
           // Don't handle clicks if on title screen (title screen has its own handler)
           if (gameState === 'title') {
+            return;
+          }
+
+          // If the tutorial popup is showing, ignore ALL canvas clicks.
+          // This makes the tutorial behave like a proper modal:
+          //  - Player can only close it with Space (handled in keydown)
+          //  - Minigames and other UI cannot be clicked "through" it
+          if (tutorial.active && dayTime.currentDay === 0) {
             return;
           }
 
@@ -2369,6 +2417,12 @@
           camera.x = Math.round(camera.x);
           camera.y = Math.round(camera.y);
 
+          // Clear any stored radar discoveries from previous days.
+          // Otherwise, we keep drawing yellow X markers for secretX tiles
+          // that no longer exist in the new day's tileMap (the "ghost X" bug).
+          radar.discoveredSecretX = [];
+          radar.rings = [];
+
           // Regenerate tiles (randomize X's) and ensure sprites are loaded
           tileMap = generateTiles();
           tileRegenerationScheduled = false; // Reset flag to allow regeneration
@@ -2581,6 +2635,7 @@
             !inventory.open &&
             !systemMessage.text &&
             !oldGuy.dialogue &&
+            !warningGuy.dialogue &&
             !joseph.dialogue &&
             !curator.dialogue &&
             !cannonBuff.dialogue &&
@@ -2591,6 +2646,11 @@
             !typoMinigame.active &&
             !gameOver.active
           ) {
+            // Keep the player from walking through NPCs in the overworld
+            resolveOldGuyCollision();
+            resolveWarningGuyCollision();
+            resolveJosephCollision();
+
             const wantsSprint = pressed('ShiftLeft') || pressed('ShiftRight');
 
             // Decouple boost from draining so the bar can reach 0
@@ -2864,6 +2924,24 @@
           }
         }
 
+        // Warning Guy collision (same pattern as other circular NPCs)
+        function resolveWarningGuyCollision() {
+          const playerRadius = player.radius; // Use cached radius
+          const dx = player.x - warningGuy.x;
+          const dy = player.y - warningGuy.y;
+          const distSq = dx * dx + dy * dy;
+          const minDist = warningGuy.radius + playerRadius;
+          const minDistSq = minDist * minDist;
+
+          if (distSq < minDistSq && distSq > 0) {
+            const dist = Math.sqrt(distSq);
+            const overlap = minDist - dist;
+            const invDist = 1 / dist; // Cache inverse distance
+            player.x += dx * invDist * overlap;
+            player.y += dy * invDist * overlap;
+          }
+        }
+
         function resolveJosephCollision() {
           const playerRadius = player.radius; // Use cached radius
           const dx = player.x - joseph.x;
@@ -3075,6 +3153,46 @@
           } else {
             // After intro is complete, just close the "hurry up" message
             oldGuy.dialogue = null;
+          }
+        }
+
+        // Warning Guy dialogue:
+        // - First time: multi-line conversation about permits.
+        // - After that: short repeat line.
+        function advanceWarningGuyDialogue() {
+          if (!warningGuy.hasCompletedIntro) {
+            warningGuy.dialogueStage++;
+
+            if (warningGuy.dialogueStage === 1) {
+              warningGuy.dialogue =
+                'Hey, you there, are you really an archeologist?';
+            } else if (warningGuy.dialogueStage === 2) {
+              warningGuy.dialogue =
+                "You are? Good. Can't believe the nerve of some people.";
+            } else if (warningGuy.dialogueStage === 3) {
+              warningGuy.dialogue =
+                "They come here with their metal detector's and shovels, trying to find some souvenir or something.";
+            } else if (warningGuy.dialogueStage === 4) {
+              warningGuy.dialogue =
+                "Don't they know you have to be given permission to excavate an area?";
+            } else if (warningGuy.dialogueStage >= 5) {
+              // End of intro conversation
+              warningGuy.dialogue = null;
+              warningGuy.hasCompletedIntro = true;
+              warningGuy.dialogueStage = 0;
+            }
+          } else {
+            // After intro:
+            // - First call (from interaction) shows the short line
+            // - Next Space press closes it
+            if (!warningGuy.dialogue) {
+              // Start repeat line
+              warningGuy.dialogue = 'So long as you have a permit, have fun!';
+            } else {
+              // Close repeat line
+              warningGuy.dialogue = null;
+            }
+            warningGuy.dialogueStage = 0;
           }
         }
 
@@ -3316,6 +3434,30 @@
             return;
           }
 
+          // Check if player is touching Warning Guy (collision-based)
+          dx = player.x - warningGuy.x;
+          dy = player.y - warningGuy.y;
+          distSq = dx * dx + dy * dy;
+          minDist = warningGuy.radius + playerRadius;
+          minDistSq = minDist * minDist;
+
+          // Same idea as oldGuy: only interact when very close to him
+          if (distSq <= minDistSq * 1.2) {
+            if (!warningGuy.hasCompletedIntro) {
+              // Start permit-warning intro sequence
+              warningGuy.dialogueStage = 0;
+              advanceWarningGuyDialogue();
+            } else {
+              // After intro, jump straight to his short repeat line
+              warningGuy.dialogueStage = 0;
+              advanceWarningGuyDialogue();
+            }
+            // Stop the player so the dialogue feels intentional
+            player.vx = 0;
+            player.vy = 0;
+            return;
+          }
+
           // Check if player is touching Joseph (collision-based)
           // Increase interaction distance to make it easier to talk to Joseph
           dx = player.x - joseph.x;
@@ -3419,6 +3561,7 @@
           'Bullets',
           'Grapeshot',
           'Buttons',
+          'Fork',
           'Ornate pin',
           'Canteen',
           'Cannon',
@@ -3429,6 +3572,7 @@
           Bullets: 'common',
           Grapeshot: 'uncommon',
           Buttons: 'uncommon',
+          Fork: 'common',
           'Ornate pin': 'rare',
           Canteen: 'rare',
           'Cannon Shards': 'super rare',
@@ -3444,6 +3588,23 @@
 
         function getArtifactTier(itemName) {
           return artifactTiers[itemName] || 'common';
+        }
+
+        // Helper to check if the player or museum already has a Cannon artifact.
+        // This enforces the rule: you can only ever obtain ONE Cannon per save.
+        function playerOrMuseumHasCannon() {
+          // Check inventory slots
+          const hasInInventory = inventory.slots.some(
+            (slot) => slot && slot.type === 'artifact' && slot.name === 'Cannon'
+          );
+
+          // Check museum cannon display
+          const hasInMuseum =
+            museum.cannonDisplay &&
+            museum.cannonDisplay.artifact &&
+            museum.cannonDisplay.artifact.name === 'Cannon';
+
+          return hasInInventory || hasInMuseum;
         }
 
         // Check if a tier is above another tier (strictly higher)
@@ -3565,26 +3726,43 @@
               }
             } else {
               // 7.5% chance - Cannon (legendary)
-              if (cannonSprite.complete && cannonSprite.naturalWidth > 0) {
+              // But only if the player/museum doesn't already have one.
+              if (
+                cannonSprite.complete &&
+                cannonSprite.naturalWidth > 0 &&
+                !playerOrMuseumHasCannon()
+              ) {
                 return tryAddReward('Cannon', cannonSprite);
+              }
+              // If we already have a Cannon, fall back to Cannon Shards instead.
+              if (
+                cannonShardsSprite.complete &&
+                cannonShardsSprite.naturalWidth > 0
+              ) {
+                return tryAddReward('Cannon Shards', cannonShardsSprite);
               }
             }
           } else {
             // Normal X: standard distribution
-            if (roll < 0.2) {
-              // 20% chance - Rusty Nails (common)
+            if (roll < 0.15) {
+              // 15% chance - Rusty Nails (common)
               if (
                 rustyNailsSprite.complete &&
                 rustyNailsSprite.naturalWidth > 0
               ) {
                 return tryAddReward('Rusty Nails', rustyNailsSprite);
               }
-            } else if (roll < 0.4) {
-              // 20% chance - Bullets (common)
+            } else if (roll < 0.3) {
+              // 15% chance - Bullets (common)
               if (bulletsSprite.complete && bulletsSprite.naturalWidth > 0) {
                 return tryAddReward('Bullets', bulletsSprite);
               }
-            } else if (roll < 0.56) {
+            } else if (roll < 0.45) {
+              // 15% chance - Fork (common)
+              if (forkSprite.complete && forkSprite.naturalWidth > 0) {
+                return tryAddReward('Fork', forkSprite);
+              }
+            } else if (roll < 0.61) {
               // 16% chance - Grapeshot (uncommon)
               if (
                 grapeshotSprite.complete &&
@@ -3592,7 +3770,7 @@
               ) {
                 return tryAddReward('Grapeshot', grapeshotSprite);
               }
-            } else if (roll < 0.72) {
+            } else if (roll < 0.77) {
               // 16% chance - Buttons (uncommon)
               if (buttonsSprite.complete && buttonsSprite.naturalWidth > 0) {
                 return tryAddReward('Buttons', buttonsSprite);
@@ -4586,6 +4764,64 @@
           ctx.restore();
         }
 
+        // Warning Guy NPC rendering (uses same scale/shadow style as Old Guy)
+        function drawWarningGuy() {
+          ctx.save();
+
+          if (warningGuySprite.complete && warningGuySprite.naturalWidth > 0) {
+            // Match Old Guy's on-screen size for consistency
+            const spriteWidth = 43;
+            const spriteHeight = 43;
+
+            // Shadow
+            ctx.fillStyle = 'rgba(0,0,0,0.25)';
+            ctx.beginPath();
+            ctx.ellipse(
+              warningGuy.x,
+              warningGuy.y + spriteHeight * 0.35,
+              spriteWidth * 0.5,
+              spriteHeight * 0.22,
+              0,
+              0,
+              Math.PI * 2
+            );
+            ctx.fill();
+
+            // Draw sprite centered on NPC position
+            const px = Math.round(warningGuy.x - spriteWidth / 2);
+            const py = Math.round(warningGuy.y - spriteHeight / 2);
+            ctx.imageSmoothingEnabled = false;
+            ctx.drawImage(warningGuySprite, px, py, spriteWidth, spriteHeight);
+          } else {
+            // Simple fallback circle while the sprite is loading/missing
+            ctx.fillStyle = 'rgba(0,0,0,0.25)';
+            ctx.beginPath();
+            ctx.ellipse(
+              warningGuy.x,
+              warningGuy.y + warningGuy.radius * 0.4,
+              warningGuy.radius * 0.6,
+              warningGuy.radius * 0.2,
+              0,
+              0,
+              Math.PI * 2
+            );
+            ctx.fill();
+
+            ctx.fillStyle = '#8b6f47';
+            ctx.beginPath();
+            ctx.arc(
+              warningGuy.x,
+              warningGuy.y,
+              warningGuy.radius,
+              0,
+              Math.PI * 2
+            );
+            ctx.fill();
+          }
+
+          ctx.restore();
+        }
+
         function drawRadar() {
           if (!radar.active) return;
 
@@ -5272,6 +5508,9 @@
 
           // Old Guy NPC
           drawOldGuy();
+
+          // Warning Guy NPC (new, to the left of spawn)
+          drawWarningGuy();
 
           // Joseph NPC (shopkeeper with radar)
           drawJoseph();
@@ -6479,6 +6718,7 @@
             systemMessage.text ||
             (tutorial.active && dayTime.currentDay === 0) ||
             oldGuy.dialogue ||
+            warningGuy.dialogue ||
             joseph.dialogue ||
             curator.dialogue ||
             cannonBuff.dialogue
@@ -6778,6 +7018,8 @@
             characterName = 'Candy Kid';
           } else if (oldGuy.dialogue) {
             characterName = 'Uncle Bernie';
+          } else if (warningGuy.dialogue) {
+            characterName = 'Jake';
           } else if (joseph.dialogue) {
             characterName = 'Joseph';
           } else if (curator.dialogue) {
@@ -6812,6 +7054,7 @@
             : tutorial.active
             ? tutorial.dialogue
             : oldGuy.dialogue ||
+              warningGuy.dialogue ||
               joseph.dialogue ||
               curator.dialogue ||
               cannonBuff.dialogue ||
@@ -7291,6 +7534,17 @@
           );
           ctx.stroke();
 
+          // Label above delete button to make its purpose obvious
+          ctx.fillStyle = '#ff5555'; // Bright red text
+          ctx.font = '12px ui-monospace, Menlo, Consolas, monospace';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'bottom';
+          ctx.fillText(
+            'Delete',
+            deleteButtonX + deleteButtonSize / 2,
+            deleteButtonY - 4
+          );
+
           // Instructions
           ctx.fillStyle = '#ffffff';
           ctx.font = '12px ui-monospace, Menlo, Consolas, monospace';
@@ -7721,6 +7975,17 @@
           );
           ctx.stroke();
 
+          // Label above delete button to make its purpose obvious
+          ctx.fillStyle = '#ff5555'; // Bright red text
+          ctx.font = '12px ui-monospace, Menlo, Consolas, monospace';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'bottom';
+          ctx.fillText(
+            'Delete',
+            deleteButtonX + deleteButtonSize / 2,
+            deleteButtonY - 4
+          );
+
           ctx.restore();
         }
 
@@ -7883,14 +8148,14 @@
           ctx.font = '16px ui-monospace, Menlo, Consolas, monospace';
           ctx.textAlign = 'center';
           ctx.textBaseline = 'middle';
-          
+
           const controlsText = [
             'Use the WASD keys or the Arrow keys on your keyboard to move',
             'Press the space button when close to a person to talk to them',
             'Hold down the shift key to move faster. Keep an eye on your stamina on the top left!',
             'Press E to open your inventory to check your artifacts',
           ];
-          
+
           let textY = canvas.height / 2 - 40;
           for (let i = 0; i < controlsText.length; i++) {
             ctx.fillText(controlsText[i], canvas.width / 2, textY);
