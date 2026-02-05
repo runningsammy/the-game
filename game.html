@@ -103,12 +103,366 @@
           speed: 0.3, // radians per second (slow, smooth rotation)
         };
 
-        // Game state: 'loading', 'title', 'controls', 'starting', 'playing',
+        // Game state: 'loading', 'title', 'achievements', 'saveSelect', 'controls', 'starting', 'playing',
         // 'dayEnd', 'museum', or 'weekEnd'
         let gameState = 'loading';
 
+        // Achievements system
+        // Achievements are global (not per-save) and persist across all games
+        const achievements = {
+          // List of achievements - each has: id, name, description, completed (boolean)
+          // Names are always visible, descriptions show "???" when locked
+          list: [
+            { id: 'clocking_out', name: 'Clocking out', description: 'Complete a full week of work', completed: false },
+            { id: 'scanning_master', name: 'Scanning master', description: 'You got the radar', iconType: 'radar', completed: false },
+            { id: 'henry_knox_experience', name: 'Henry Knox Experience', description: 'You displayed the cannon', iconType: 'cannon', completed: false },
+            { id: 'nothing', name: 'Nothing', description: "You didn't do anything. Wow.", completed: false },
+            { id: 'consolation_prize', name: 'Consolation prize', description: "You didn't do that bad, I guess.", completed: false },
+            { id: 'classic', name: 'Classic', description: 'Congrats on a amazing museum!', completed: false },
+            { id: 'overachiever', name: 'Overachiever', description: 'You did great! There may be something you are missing, though.', completed: false },
+            { id: 'locked1', name: 'Achievement 2', description: '???', completed: false },
+            { id: 'locked2', name: 'Achievement 3', description: '???', completed: false },
+            { id: 'locked3', name: 'Achievement 4', description: '???', completed: false },
+            { id: 'locked4', name: 'Achievement 5', description: '???', completed: false },
+            { id: 'locked5', name: 'Achievement 6', description: '???', completed: false },
+            { id: 'locked6', name: 'Achievement 7', description: '???', completed: false },
+            { id: 'locked7', name: 'Achievement 8', description: '???', completed: false },
+            { id: 'locked8', name: 'Achievement 9', description: '???', completed: false },
+            { id: 'locked9', name: 'Achievement 10', description: '???', completed: false },
+          ],
+        };
+
+        // Save achievements to localStorage (global, not per-save)
+        function saveAchievements() {
+          try {
+            const achievementsData = achievements.list.map(a => ({
+              id: a.id,
+              completed: a.completed,
+            }));
+            localStorage.setItem('gameAchievements', JSON.stringify(achievementsData));
+          } catch (error) {
+            console.error('Failed to save achievements:', error);
+          }
+        }
+
+        // Load achievements from localStorage
+        function loadAchievements() {
+          try {
+            const achievementsDataStr = localStorage.getItem('gameAchievements');
+            if (achievementsDataStr) {
+              const achievementsData = JSON.parse(achievementsDataStr);
+              // Merge saved completion status with current achievement list
+              achievements.list.forEach(achievement => {
+                const saved = achievementsData.find(a => a.id === achievement.id);
+                if (saved) {
+                  achievement.completed = saved.completed;
+                }
+              });
+            }
+          } catch (error) {
+            console.error('Failed to load achievements:', error);
+          }
+        }
+
         // Start-game flow: queue heavy setup so input feels instant
         let startGamePending = false;
+
+        // Auto-save timer (save every 30 seconds during gameplay)
+        let autoSaveTimer = 0;
+        const AUTO_SAVE_INTERVAL = 30000; // 30 seconds in milliseconds
+
+        // Save system: 3 save slots using localStorage
+        // Each save slot stores: game state, player data, inventory, museum, etc.
+        const SAVE_SLOTS = 3;
+        let currentSaveSlot = null; // Track which save slot is currently active (0-2)
+
+        // Save game state to localStorage
+        // This function captures all important game data and stores it in the browser's localStorage
+        // localStorage persists even after closing the browser, making saves permanent
+        function saveGame(slotIndex) {
+          try {
+            // Create a save data object with all game state
+            const saveData = {
+              version: 1, // Save format version (for future compatibility)
+              timestamp: Date.now(), // When this save was created
+              completed: false, // Whether the week has been completed
+
+              // Game state
+              gameState: gameState,
+
+              // Player data
+              player: {
+                x: player.x,
+                y: player.y,
+                vx: player.vx,
+                vy: player.vy,
+              },
+
+              // Camera position
+              camera: {
+                x: camera.x,
+                y: camera.y,
+              },
+
+              // Day/time system
+              dayTime: {
+                currentDay: dayTime.currentDay,
+                currentHour: dayTime.currentHour,
+                hourTimer: dayTime.hourTimer,
+              },
+
+              // Inventory
+              inventory: {
+                slots: JSON.parse(JSON.stringify(inventory.slots)), // Deep copy
+                equipment: inventory.equipment,
+                speedBrush: inventory.speedBrush,
+              },
+
+              // Museum state
+              museum: {
+                displayCases: JSON.parse(JSON.stringify(museum.displayCases)), // Deep copy
+                cannonDisplay: museum.cannonDisplay
+                  ? JSON.parse(JSON.stringify(museum.cannonDisplay))
+                  : null,
+                hasInitializedDisplays: museum.hasInitializedDisplays,
+              },
+
+              // Radar discoveries
+              radar: {
+                discoveredSecretX: JSON.parse(
+                  JSON.stringify(radar.discoveredSecretX)
+                ),
+                rings: JSON.parse(JSON.stringify(radar.rings)),
+              },
+
+              // NPC dialogue states
+              npcs: {
+                oldGuy: {
+                  hasCompletedIntro: oldGuy.hasCompletedIntro,
+                },
+                joseph: {
+                  hasGivenRadar: joseph.hasGivenRadar,
+                },
+                warningGuy: {
+                  hasCompletedIntro: warningGuy.hasCompletedIntro,
+                },
+                curator: {
+                  hasCompletedIntro: curator.hasCompletedIntro,
+                },
+                cannonBuff: {
+                  hasCompletedIntro: cannonBuff.hasCompletedIntro,
+                  hasGivenReward: cannonBuff.hasGivenReward,
+                },
+              },
+
+              // Quest states
+              quests: {
+                getCannonForCannonBuff: {
+                  active: quests.getCannonForCannonBuff.active,
+                  completed: quests.getCannonForCannonBuff.completed,
+                },
+              },
+
+              // Tile map: save which tiles have been converted (X -> grass)
+              // We don't save the entire tileMap (it's regenerated each day),
+              // but we track which X tiles have been used
+              convertedTiles: [], // Array of {row, col} for tiles converted from X to grass
+            };
+
+            // Store in localStorage with key "gameSave_slot0", "gameSave_slot1", etc.
+            const saveKey = `gameSave_slot${slotIndex}`;
+            localStorage.setItem(saveKey, JSON.stringify(saveData));
+
+            return true;
+          } catch (error) {
+            console.error('Failed to save game:', error);
+            return false;
+          }
+        }
+
+        // Load game state from localStorage
+        // This function restores all saved game data
+        function loadGame(slotIndex) {
+          try {
+            const saveKey = `gameSave_slot${slotIndex}`;
+            const saveDataStr = localStorage.getItem(saveKey);
+
+            if (!saveDataStr) {
+              return false; // No save data found
+            }
+
+            const saveData = JSON.parse(saveDataStr);
+
+            // Restore game state
+            if (saveData.gameState) {
+              gameState = saveData.gameState;
+            }
+
+            // Restore player position
+            if (saveData.player) {
+              player.x = saveData.player.x;
+              player.y = saveData.player.y;
+              player.vx = saveData.player.vx || 0;
+              player.vy = saveData.player.vy || 0;
+            }
+
+            // Restore camera
+            if (saveData.camera) {
+              camera.x = saveData.camera.x;
+              camera.y = saveData.camera.y;
+            }
+
+            // Restore day/time
+            if (saveData.dayTime) {
+              dayTime.currentDay = saveData.dayTime.currentDay;
+              dayTime.currentHour = saveData.dayTime.currentHour;
+              dayTime.hourTimer = saveData.dayTime.hourTimer || 0;
+            }
+
+            // Restore inventory
+            if (saveData.inventory) {
+              inventory.slots = saveData.inventory.slots || Array(25).fill(null);
+              // Restore artifact sprites (they don't serialize properly)
+              for (let i = 0; i < inventory.slots.length; i++) {
+                if (inventory.slots[i] && inventory.slots[i].name) {
+                  const sprite = getArtifactSpriteByName(inventory.slots[i].name);
+                  if (sprite) {
+                    inventory.slots[i].sprite = sprite;
+                  }
+                }
+              }
+              // Restore equipment sprite if it's an artifact
+              if (inventory.equipment && inventory.equipment.name) {
+                const equipmentSprite = getArtifactSpriteByName(inventory.equipment.name);
+                if (equipmentSprite) {
+                  inventory.equipment.sprite = equipmentSprite;
+                }
+              }
+              inventory.speedBrush = saveData.inventory.speedBrush || false;
+            }
+
+            // Restore museum
+            if (saveData.museum) {
+              museum.displayCases = saveData.museum.displayCases || [];
+              // Restore artifact sprites in display cases
+              for (let i = 0; i < museum.displayCases.length; i++) {
+                if (museum.displayCases[i].artifact && museum.displayCases[i].artifact.name) {
+                  const sprite = getArtifactSpriteByName(museum.displayCases[i].artifact.name);
+                  if (sprite) {
+                    museum.displayCases[i].artifact.sprite = sprite;
+                  }
+                }
+              }
+              // Restore cannon display sprite
+              if (museum.cannonDisplay && museum.cannonDisplay.artifact && museum.cannonDisplay.artifact.name) {
+                const sprite = getArtifactSpriteByName(museum.cannonDisplay.artifact.name);
+                if (sprite) {
+                  museum.cannonDisplay.artifact.sprite = sprite;
+                }
+              }
+              museum.hasInitializedDisplays =
+                saveData.museum.hasInitializedDisplays || false;
+            }
+
+            // Restore radar
+            if (saveData.radar) {
+              radar.discoveredSecretX = saveData.radar.discoveredSecretX || [];
+              radar.rings = saveData.radar.rings || [];
+            }
+
+            // Restore NPC states
+            if (saveData.npcs) {
+              if (saveData.npcs.oldGuy) {
+                oldGuy.hasCompletedIntro =
+                  saveData.npcs.oldGuy.hasCompletedIntro || false;
+              }
+              if (saveData.npcs.joseph) {
+                joseph.hasGivenRadar = saveData.npcs.joseph.hasGivenRadar || false;
+              }
+              if (saveData.npcs.warningGuy) {
+                warningGuy.hasCompletedIntro =
+                  saveData.npcs.warningGuy.hasCompletedIntro || false;
+              }
+              if (saveData.npcs.curator) {
+                curator.hasCompletedIntro =
+                  saveData.npcs.curator.hasCompletedIntro || false;
+              }
+              if (saveData.npcs.cannonBuff) {
+                cannonBuff.hasCompletedIntro =
+                  saveData.npcs.cannonBuff.hasCompletedIntro || false;
+                cannonBuff.hasGivenReward =
+                  saveData.npcs.cannonBuff.hasGivenReward || false;
+              }
+            }
+
+            // Restore quests
+            if (saveData.quests) {
+              if (saveData.quests.getCannonForCannonBuff) {
+                quests.getCannonForCannonBuff.active =
+                  saveData.quests.getCannonForCannonBuff.active || false;
+                quests.getCannonForCannonBuff.completed =
+                  saveData.quests.getCannonForCannonBuff.completed || false;
+              }
+            }
+
+            // Regenerate tiles (they're regenerated each day anyway)
+            tileMap = generateTiles();
+            tileRegenerationScheduled = false;
+            doRegenerateTiles();
+
+            // Mark this as the current save slot
+            currentSaveSlot = slotIndex;
+
+            return true;
+          } catch (error) {
+            console.error('Failed to load game:', error);
+            return false;
+          }
+        }
+
+        // Get save slot info (for displaying in menu)
+        // Returns metadata about a save slot without loading the full game
+        function getSaveSlotInfo(slotIndex) {
+          try {
+            const saveKey = `gameSave_slot${slotIndex}`;
+            const saveDataStr = localStorage.getItem(saveKey);
+
+            if (!saveDataStr) {
+              return null; // Empty slot
+            }
+
+            const saveData = JSON.parse(saveDataStr);
+
+            return {
+              exists: true,
+              completed: saveData.completed || false,
+              timestamp: saveData.timestamp || 0,
+              dayTime: saveData.dayTime || { currentDay: 0, currentHour: 8 },
+            };
+          } catch (error) {
+            console.error('Failed to get save slot info:', error);
+            return null;
+          }
+        }
+
+        // Delete a save slot
+        function deleteSaveSlot(slotIndex) {
+          try {
+            const saveKey = `gameSave_slot${slotIndex}`;
+            localStorage.removeItem(saveKey);
+            return true;
+          } catch (error) {
+            console.error('Failed to delete save slot:', error);
+            return false;
+          }
+        }
+
+        // Auto-save during gameplay (called periodically)
+        function autoSave() {
+          if (currentSaveSlot !== null && gameState === 'playing') {
+            saveGame(currentSaveSlot);
+          }
+        }
 
         // Loading screen facts - random facts shown while loading
         // These help entertain the player during asset loading
@@ -536,6 +890,48 @@
           hasStartedFirstTime: false, // Track if this minigame type has been started before
         };
 
+        // Quiz minigame questions
+        // Each question has a question text and the correct answer (true = Yes, false = No)
+        const quizQuestions = [
+          {
+            question: 'A bigger shovel is always better.',
+            correctAnswer: false, // No
+          },
+          {
+            question: 'A backhoe is common in digs.',
+            correctAnswer: true, // Yes
+          },
+          {
+            question: 'You should always get permission to dig on land you do not own.',
+            correctAnswer: true, // Yes
+          },
+          {
+            question: 'If you find a grave while digging, you should open it without consulting the property owners.',
+            correctAnswer: false, // No
+          },
+          {
+            question: "You don't need a permit to dig on a dig site.",
+            correctAnswer: false, // No
+          },
+        ];
+
+        // Quiz minigame - asks yes/no questions about archaeology
+        const quizMinigame = {
+          active: false,
+          baseReward: 50,
+          penalty: 30,
+          tileRow: null,
+          tileCol: null,
+          question: '',
+          correctAnswer: false, // true = Yes, false = No
+          answered: false,
+          wasCorrect: false,
+          actualReward: 0,
+          isSecretX: false, // Track if this minigame came from a secret X tile
+          showInstructions: false, // Track if question mark was clicked
+          hasStartedFirstTime: false, // Track if this minigame type has been started before
+        };
+
         // Optimize sprite loading: set imageSmoothingEnabled before src for faster rendering
 
         const brushSprite = new Image();
@@ -745,6 +1141,10 @@
         cannonSprite.imageSmoothingEnabled = false;
         cannonSprite.src = 'assets/sprites/Cannon.png';
 
+        const cartridgeSprite = new Image();
+        cartridgeSprite.imageSmoothingEnabled = false;
+        cartridgeSprite.src = 'assets/sprites/Cartridge.png';
+
         const cannonShardsSprite = new Image();
         cannonShardsSprite.imageSmoothingEnabled = false;
         cannonShardsSprite.src = 'assets/sprites/Cannon_shards.png';
@@ -776,6 +1176,20 @@
         const cannonDisplaySprite = new Image();
         cannonDisplaySprite.imageSmoothingEnabled = false;
         cannonDisplaySprite.src = 'assets/sprites/Cannon_display.png';
+
+        // Trophy sprite for achievements
+        const trophySprite = new Image();
+        trophySprite.imageSmoothingEnabled = false;
+        trophySprite.src = 'assets/sprites/Trophy.png';
+
+        // Achievement icon sprites (radar and cannon for specific achievements)
+        const radarIconSprite = new Image();
+        radarIconSprite.imageSmoothingEnabled = false;
+        radarIconSprite.src = 'assets/sprites/Radar.png';
+
+        const cannonIconSprite = new Image();
+        cannonIconSprite.imageSmoothingEnabled = false;
+        cannonIconSprite.src = 'assets/sprites/Cannon.png';
 
         // Load player sprites from PNG images
         const playerSpriteIdle = new Image();
@@ -1328,6 +1742,11 @@
 
           // Start the game
           gameState = 'playing';
+
+          // Save the new game
+          if (currentSaveSlot !== null) {
+            saveGame(currentSaveSlot);
+          }
         }
 
         window.addEventListener(
@@ -1530,7 +1949,28 @@
             // Week end: Space to return to title
             if (gameState === 'weekEnd' && e.code === 'Space') {
               e.preventDefault();
+
+              // Mark save as completed before returning to title
+              if (currentSaveSlot !== null) {
+                try {
+                  const saveKey = `gameSave_slot${currentSaveSlot}`;
+                  const saveDataStr = localStorage.getItem(saveKey);
+                  if (saveDataStr) {
+                    const saveData = JSON.parse(saveDataStr);
+                    saveData.completed = true;
+                    localStorage.setItem(saveKey, JSON.stringify(saveData));
+                  }
+                } catch (error) {
+                  console.error('Failed to mark save as completed:', error);
+                }
+              }
+
+              // Reset current save slot
+              currentSaveSlot = null;
+
+              // Return to title screen
               gameState = 'title';
+
               // Reset everything for new game (will be fully reset when starting from title)
               dayTime.currentDay = 0; // Start on Monday
               dayTime.currentHour = 8; // Start at 8:00 AM
@@ -1738,6 +2178,51 @@
             }
 
             // Close button removed
+          }
+
+          // Quiz minigame buttons
+          if (quizMinigame.active && !quizMinigame.answered) {
+            // Prevent interaction when tutorial popup is active
+            if (tutorial.active && dayTime.currentDay === 0) {
+              return;
+            }
+
+            // Calculate button positions (same as in render function)
+            const panelWidth = 700;
+            const panelHeight = 500;
+            const panelX = (canvas.width - panelWidth) / 2;
+            const panelY = (canvas.height - panelHeight) / 2;
+
+            const buttonY = panelY + panelHeight - 80;
+            const buttonWidth = 150;
+            const buttonHeight = 40;
+            const buttonSpacing = 20;
+            const totalButtonWidth = buttonWidth * 2 + buttonSpacing;
+            const buttonStartX = canvas.width / 2 - totalButtonWidth / 2;
+
+            // Yes button (left)
+            const yesButtonX = buttonStartX;
+            if (
+              x >= yesButtonX &&
+              x <= yesButtonX + buttonWidth &&
+              y >= buttonY &&
+              y <= buttonY + buttonHeight
+            ) {
+              handleQuizAnswer(true); // Yes
+              return;
+            }
+
+            // No button (right)
+            const noButtonX = buttonStartX + buttonWidth + buttonSpacing;
+            if (
+              x >= noButtonX &&
+              x <= noButtonX + buttonWidth &&
+              y >= buttonY &&
+              y <= buttonY + buttonHeight
+            ) {
+              handleQuizAnswer(false); // No
+              return;
+            }
           }
 
           // Build mode click handling (select artifacts and place in display cases)
@@ -1969,21 +2454,43 @@
                 (canvas.width - instructionsPanelWidth) / 2;
               const instructionsPanelY =
                 (canvas.height - instructionsPanelHeight) / 2;
+              // Close instructions on click
+              typoMinigame.showInstructions = false;
+              return;
+            }
+          }
 
-              if (
-                x < instructionsPanelX ||
-                x > instructionsPanelX + instructionsPanelWidth ||
-                y < instructionsPanelY ||
-                y > instructionsPanelY + instructionsPanelHeight
-              ) {
-                typoMinigame.showInstructions = false;
-                return;
-              }
-              // Clicked inside instructions panel - keep it open
+          // Quiz minigame clicks
+          if (quizMinigame.active) {
+            // Prevent interaction when tutorial popup is active
+            if (tutorial.active && dayTime.currentDay === 0) {
               return;
             }
 
-            if (!typoMinigame.answered) {
+            // If instructions are showing, close them on any click and block all other interactions
+            if (quizMinigame.showInstructions) {
+              // Close instructions on any click
+              quizMinigame.showInstructions = false;
+              return;
+            }
+
+            // Check for question mark click
+            const questionMarkX = 15;
+            const questionMarkY = canvas.height - 15;
+            const questionMarkSize = 34;
+            const questionMarkPadding = 6;
+            if (
+              x >= questionMarkX - questionMarkPadding &&
+              x <= questionMarkX + questionMarkSize + questionMarkPadding &&
+              y >= questionMarkY - questionMarkSize - questionMarkPadding &&
+              y <= questionMarkY + questionMarkPadding
+            ) {
+              // Toggle instructions
+              quizMinigame.showInstructions = !quizMinigame.showInstructions;
+              return;
+            }
+
+            if (!quizMinigame.answered) {
               // Calculate button positions (same as in render function)
               const panelWidth = 700;
               const panelHeight = 500;
@@ -2216,8 +2723,8 @@
 
             // Check if clicking on red X delete button
             const deleteButtonSize = 40;
-            const deleteButtonX = panelX + inventoryWidth + 20;
-            const deleteButtonY = panelY + titleHeight;
+            const deleteButtonX = buildLayout.panelX + buildLayout.panelWidth + 60; // 60px spacing from inventory (moved right)
+            const deleteButtonY = buildLayout.panelY + buildLayout.titleHeight;
 
             if (
               x >= deleteButtonX &&
@@ -2359,12 +2866,12 @@
             museum.displayCases.push({ row: 3, col: 1, artifact: null });
             museum.displayCases.push({ row: 6, col: 1, artifact: null });
             museum.displayCases.push({ row: 9, col: 1, artifact: null });
-            museum.displayCases.push({ row: 12, col: 1, artifact: null });
+            // Removed bottom two displays (row 12, col 1 and row 12, col 14)
             // Right wall cases (col 14 = inside the right wall)
             museum.displayCases.push({ row: 3, col: 14, artifact: null });
             museum.displayCases.push({ row: 6, col: 14, artifact: null });
             museum.displayCases.push({ row: 9, col: 14, artifact: null });
-            museum.displayCases.push({ row: 12, col: 14, artifact: null });
+            // Removed bottom two displays (row 12, col 1 and row 12, col 14) - already removed
 
             museum.hasInitializedDisplays = true;
           }
@@ -2385,6 +2892,21 @@
 
           // Check if week is over (Sunday = day 6, so after Sunday we're done)
           if (dayTime.currentDay > 6) {
+            // Week is over - mark save as completed
+            if (currentSaveSlot !== null) {
+              try {
+                const saveKey = `gameSave_slot${currentSaveSlot}`;
+                const saveDataStr = localStorage.getItem(saveKey);
+                if (saveDataStr) {
+                  const saveData = JSON.parse(saveDataStr);
+                  saveData.completed = true;
+                  localStorage.setItem(saveKey, JSON.stringify(saveData));
+                }
+              } catch (error) {
+                console.error('Failed to mark save as completed:', error);
+              }
+            }
+
             // Week is over
             gameState = 'weekEnd';
             return;
@@ -2450,14 +2972,25 @@
               dayTime.hourTimer = 0; // Reset timer for new hour
             }
 
+            // Auto-save periodically (every 30 seconds)
+            autoSaveTimer += dtMs;
+            if (autoSaveTimer >= AUTO_SAVE_INTERVAL) {
+              autoSave();
+              autoSaveTimer = 0; // Reset timer
+            }
+
             // Check if day should end (6 PM = 18:00)
             // Only end day if not in a minigame
             if (
               dayTime.currentHour >= dayTime.dayEndHour &&
               !brushingMinigame.active &&
               !minesweeperMinigame.active &&
-              !typoMinigame.active
+              !typoMinigame.active &&
+              !quizMinigame.active
             ) {
+              // Auto-save before day ends
+              autoSave();
+
               // Go to museum (except Sunday/after Sunday)
               if (dayTime.currentDay < 6) {
                 // Not Sunday yet, go to museum
@@ -2872,6 +3405,7 @@
           updateBrushingMinigame(dtMs);
           updateMinesweeperMinigame(dtMs);
           updateTypoMinigame(dtMs);
+          updateQuizMinigame(dtMs);
           updateRadar(dtMs);
         }
 
@@ -3531,11 +4065,60 @@
             return;
           }
 
-          const col = Math.floor(player.x / tileSize);
-          const row = Math.floor(player.y / tileSize);
+          // Check if player's bounding box overlaps with any red X or secret X tile
+          // This makes the hitbox cover the entire tile, not just the player's center point
+          const playerLeft = player.x - player.radius;
+          const playerRight = player.x + player.radius;
+          const playerTop = player.y - player.radius;
+          const playerBottom = player.y + player.radius;
 
-          if (row >= 0 && row < tileRows && col >= 0 && col < tileCols) {
-            const tile = tileMap[row][col];
+          // Check all tiles that the player's bounding box overlaps with
+          const startCol = Math.floor(playerLeft / tileSize);
+          const endCol = Math.floor(playerRight / tileSize);
+          const startRow = Math.floor(playerTop / tileSize);
+          const endRow = Math.floor(playerBottom / tileSize);
+
+          let foundXTile = null;
+          let foundRow = null;
+          let foundCol = null;
+
+          // Check each overlapping tile for red X or secret X
+          for (let row = startRow; row <= endRow; row++) {
+            if (row < 0 || row >= tileRows) continue;
+            for (let col = startCol; col <= endCol; col++) {
+              if (col < 0 || col >= tileCols) continue;
+              const tile = tileMap[row][col];
+              if (tile && (tile.name === 'redX' || tile.name === 'secretX')) {
+                // Check if player's bounding box actually overlaps with this tile's bounding box
+                const tileLeft = col * tileSize;
+                const tileRight = (col + 1) * tileSize;
+                const tileTop = row * tileSize;
+                const tileBottom = (row + 1) * tileSize;
+
+                // AABB (Axis-Aligned Bounding Box) collision check
+                // Check if rectangles overlap
+                if (
+                  playerRight > tileLeft &&
+                  playerLeft < tileRight &&
+                  playerBottom > tileTop &&
+                  playerTop < tileBottom
+                ) {
+                  foundXTile = tile;
+                  foundRow = row;
+                  foundCol = col;
+                  break; // Found an X tile, stop searching
+                }
+              }
+            }
+            if (foundXTile) break; // Found an X tile, stop searching
+          }
+
+          // If we found an X tile, interact with it
+          if (foundXTile) {
+            const tile = foundXTile;
+            const row = foundRow;
+            const col = foundCol;
+
             if (tile) {
               // Start crouch animation on any tile (prevents spamming)
               if (!crouchAnimation.active) {
@@ -3546,18 +4129,24 @@
                 if (tile.name === 'redX' || tile.name === 'secretX') {
                   // Store which minigame to start after animation
                   // Weighted random selection: brushing 28.3%, minesweeper 35.85%, typo 35.85%
-                  // (Reduced brushing chance by 5% from original 33.3%)
-                  const roll = Math.random();
-                  if (roll < 0.283) {
-                    // 28.3% chance - Brushing (reduced from 33.3%)
-                    crouchAnimation.pendingMinigame = 'brushing';
-                  } else if (roll < 0.6415) {
-                    // 35.85% chance - Minesweeper
-                    crouchAnimation.pendingMinigame = 'minesweeper';
-                  } else {
-                    // 35.85% chance - Typo
-                    crouchAnimation.pendingMinigame = 'typo';
-                  }
+                  // TESTING: Quiz minigame 100% chance
+                  crouchAnimation.pendingMinigame = 'quiz';
+
+                  // Original random selection (commented out for testing):
+                  // const roll = Math.random();
+                  // if (roll < 0.283) {
+                  //   // 28.3% chance - Brushing (reduced from 33.3%)
+                  //   crouchAnimation.pendingMinigame = 'brushing';
+                  // } else if (roll < 0.5) {
+                  //   // 25% chance - Minesweeper
+                  //   crouchAnimation.pendingMinigame = 'minesweeper';
+                  // } else if (roll < 0.75) {
+                  //   // 25% chance - Typo
+                  //   crouchAnimation.pendingMinigame = 'typo';
+                  // } else {
+                  //   // 25% chance - Quiz
+                  //   crouchAnimation.pendingMinigame = 'quiz';
+                  // }
                   // Store whether this is a secret X tile for later reward multiplier
                   crouchAnimation.isSecretX = tile.name === 'secretX';
 
@@ -3611,6 +4200,7 @@
           'Arrowhead',
           'Cannon',
           'Cannon Shards',
+          'Cartridge',
         ];
         const artifactTiers = {
           'Rusty Nails': 'common',
@@ -3623,6 +4213,7 @@
           Arrowhead: 'super rare',
           'Cannon Shards': 'super rare',
           Cannon: 'legendary',
+          Cartridge: 'legendary',
         };
         const rarityRank = {
           common: 0,
@@ -3631,6 +4222,25 @@
           'super rare': 3,
           legendary: 4,
         };
+
+        // Function to get artifact sprite by name (used when loading saves)
+        function getArtifactSpriteByName(itemName) {
+          // Map artifact names to their sprite objects
+          const spriteMap = {
+            'Rusty Nails': rustyNailsSprite,
+            Bullets: bulletsSprite,
+            Grapeshot: grapeshotSprite,
+            Buttons: buttonsSprite,
+            Fork: forkSprite,
+            'Ornate pin': pinSprite,
+            Canteen: canteenSprite,
+            Arrowhead: arrowheadSprite,
+            'Cannon Shards': cannonShardsSprite,
+            Cannon: cannonSprite,
+            Cartridge: cartridgeSprite,
+          };
+          return spriteMap[itemName] || null;
+        }
 
         function getArtifactTier(itemName) {
           return artifactTiers[itemName] || 'common';
@@ -3686,13 +4296,14 @@
         }
 
         // Function to give minigame reward (randomly chooses artifact)
-        // Distribution: 40% common, 32% uncommon, 15% rare, 8% super rare, 5% legendary
-        // For radar-discovered X's: 30% common (10% reduction), 35% uncommon, 17.5% rare, 10% super rare, 7.5% legendary
-        // Common: Rusty Nails (20%), Bullets (20%) = 40% total (30% for secret X)
-        // Uncommon: Grapeshot (16%), Buttons (16%) = 32% total (35% for secret X)
-        // Rare: Ornate pin (7.5%), Canteen (7.5%) = 15% total (17.5% for secret X)
-        // Super Rare: Cannon Shards (8%) = 8% total (10% for secret X)
-        // Legendary: Cannon (5%) = 5% total (7.5% for secret X)
+        // Distribution: 70% common, 16% uncommon, 7.5% rare, 4% super rare, 2.5% legendary
+        // For radar-discovered X's: 65% common, 17.5% uncommon, 8.75% rare, 5% super rare, 3.75% legendary
+        // Common: Rusty Nails (23.33%), Bullets (23.33%), Fork (23.33%) = 70% total (65% for secret X: 32.5% Rusty Nails, 32.5% Bullets)
+        // Uncommon: Grapeshot (8%), Buttons (8%) = 16% total (17.5% for secret X: 8.75% each)
+        // Rare: Ornate pin (3.75%), Canteen (3.75%) = 7.5% total (8.75% for secret X: 4.375% each)
+        // Super Rare: Arrowhead (2%), Cannon Shards (2%) = 4% total (5% for secret X: 2.5% each)
+        // Legendary: Cannon (1.25%, restricted to one per save), Cartridge (1.25%, unlimited) = 2.5% total
+        // For secret X: Cannon (1.875%, restricted), Cartridge (1.875%, unlimited) = 3.75% total
         function giveMinigameReward() {
           // Check if this reward is from a radar-discovered secret X
           const isSecretX =
@@ -3721,67 +4332,67 @@
           let roll = Math.random();
 
           if (isSecretX) {
-            // Radar-discovered X: 10% lower common chance, spread evenly to other rarities
-            // Common: 30% (15% Rusty Nails, 15% Bullets)
-            // Uncommon: 35% (17.5% Grapeshot, 17.5% Buttons)
-            // Rare: 17.5% (8.75% Ornate pin, 8.75% Canteen)
-            // Super Rare: 10% (Cannon Shards)
-            // Legendary: 7.5% (Cannon)
+            // Radar-discovered X: Everything twice as rare except common
+            // Common: 65% (32.5% Rusty Nails, 32.5% Bullets)
+            // Uncommon: 17.5% (8.75% Grapeshot, 8.75% Buttons)
+            // Rare: 8.75% (4.375% Ornate pin, 4.375% Canteen)
+            // Super Rare: 5% (2.5% Arrowhead, 2.5% Cannon Shards)
+            // Legendary: 3.75% (1.875% Cannon - restricted, 1.875% Cartridge - unlimited)
 
-            if (roll < 0.15) {
-              // 15% chance - Rusty Nails (common)
+            if (roll < 0.325) {
+              // 32.5% chance - Rusty Nails (common)
               if (
                 rustyNailsSprite.complete &&
                 rustyNailsSprite.naturalWidth > 0
               ) {
                 return tryAddReward('Rusty Nails', rustyNailsSprite);
               }
-            } else if (roll < 0.3) {
-              // 15% chance - Bullets (common)
+            } else if (roll < 0.65) {
+              // 32.5% chance - Bullets (common)
               if (bulletsSprite.complete && bulletsSprite.naturalWidth > 0) {
                 return tryAddReward('Bullets', bulletsSprite);
               }
-            } else if (roll < 0.475) {
-              // 17.5% chance - Grapeshot (uncommon)
+            } else if (roll < 0.7375) {
+              // 8.75% chance - Grapeshot (uncommon)
               if (
                 grapeshotSprite.complete &&
                 grapeshotSprite.naturalWidth > 0
               ) {
                 return tryAddReward('Grapeshot', grapeshotSprite);
               }
-            } else if (roll < 0.65) {
-              // 17.5% chance - Buttons (uncommon)
+            } else if (roll < 0.825) {
+              // 8.75% chance - Buttons (uncommon)
               if (buttonsSprite.complete && buttonsSprite.naturalWidth > 0) {
                 return tryAddReward('Buttons', buttonsSprite);
               }
-            } else if (roll < 0.7375) {
-              // 8.75% chance - Ornate pin (rare)
+            } else if (roll < 0.86875) {
+              // 4.375% chance - Ornate pin (rare)
               if (pinSprite.complete && pinSprite.naturalWidth > 0) {
                 return tryAddReward('Ornate pin', pinSprite);
               }
-            } else if (roll < 0.825) {
-              // 8.75% chance - Canteen (rare)
+            } else if (roll < 0.9125) {
+              // 4.375% chance - Canteen (rare)
               if (canteenSprite.complete && canteenSprite.naturalWidth > 0) {
                 return tryAddReward('Canteen', canteenSprite);
               }
-            } else if (roll < 0.875) {
-              // 5% chance - Arrowhead (super rare)
+            } else if (roll < 0.9375) {
+              // 2.5% chance - Arrowhead (super rare)
               if (
                 arrowheadSprite.complete &&
                 arrowheadSprite.naturalWidth > 0
               ) {
                 return tryAddReward('Arrowhead', arrowheadSprite);
               }
-            } else if (roll < 0.925) {
-              // 5% chance - Cannon Shards (super rare)
+            } else if (roll < 0.9625) {
+              // 2.5% chance - Cannon Shards (super rare)
               if (
                 cannonShardsSprite.complete &&
                 cannonShardsSprite.naturalWidth > 0
               ) {
                 return tryAddReward('Cannon Shards', cannonShardsSprite);
               }
-            } else {
-              // 7.5% chance - Cannon (legendary)
+            } else if (roll < 0.98125) {
+              // 1.875% chance - Cannon (legendary)
               // But only if the player/museum doesn't already have one.
               if (
                 cannonSprite.complete &&
@@ -3790,77 +4401,110 @@
               ) {
                 return tryAddReward('Cannon', cannonSprite);
               }
-              // If we already have a Cannon, fall back to Cannon Shards instead.
+              // If we already have a Cannon, fall back to Cartridge instead.
               if (
-                cannonShardsSprite.complete &&
-                cannonShardsSprite.naturalWidth > 0
+                cartridgeSprite.complete &&
+                cartridgeSprite.naturalWidth > 0
               ) {
-                return tryAddReward('Cannon Shards', cannonShardsSprite);
+                return tryAddReward('Cartridge', cartridgeSprite);
+              }
+            } else {
+              // 1.875% chance - Cartridge (legendary, unlimited)
+              if (
+                cartridgeSprite.complete &&
+                cartridgeSprite.naturalWidth > 0
+              ) {
+                return tryAddReward('Cartridge', cartridgeSprite);
               }
             }
           } else {
-            // Normal X: standard distribution
-            if (roll < 0.15) {
-              // 15% chance - Rusty Nails (common)
+            // Normal X: Everything twice as rare except common
+            // Common: 70% (23.33% Rusty Nails, 23.33% Bullets, 23.34% Fork)
+            // Uncommon: 16% (8% Grapeshot, 8% Buttons)
+            // Rare: 7.5% (3.75% Ornate pin, 3.75% Canteen)
+            // Super Rare: 4% (2% Arrowhead, 2% Cannon Shards)
+            // Legendary: 2.5% (1.25% Cannon - restricted, 1.25% Cartridge - unlimited)
+            if (roll < 0.2333) {
+              // 23.33% chance - Rusty Nails (common)
               if (
                 rustyNailsSprite.complete &&
                 rustyNailsSprite.naturalWidth > 0
               ) {
                 return tryAddReward('Rusty Nails', rustyNailsSprite);
               }
-            } else if (roll < 0.3) {
-              // 15% chance - Bullets (common)
+            } else if (roll < 0.4666) {
+              // 23.33% chance - Bullets (common)
               if (bulletsSprite.complete && bulletsSprite.naturalWidth > 0) {
                 return tryAddReward('Bullets', bulletsSprite);
               }
-            } else if (roll < 0.45) {
-              // 15% chance - Fork (common)
+            } else if (roll < 0.7) {
+              // 23.34% chance - Fork (common)
               if (forkSprite.complete && forkSprite.naturalWidth > 0) {
                 return tryAddReward('Fork', forkSprite);
               }
-            } else if (roll < 0.61) {
-              // 16% chance - Grapeshot (uncommon)
+            } else if (roll < 0.78) {
+              // 8% chance - Grapeshot (uncommon)
               if (
                 grapeshotSprite.complete &&
                 grapeshotSprite.naturalWidth > 0
               ) {
                 return tryAddReward('Grapeshot', grapeshotSprite);
               }
-            } else if (roll < 0.77) {
-              // 16% chance - Buttons (uncommon)
+            } else if (roll < 0.86) {
+              // 8% chance - Buttons (uncommon)
               if (buttonsSprite.complete && buttonsSprite.naturalWidth > 0) {
                 return tryAddReward('Buttons', buttonsSprite);
               }
-            } else if (roll < 0.795) {
-              // 7.5% chance - Ornate pin (rare)
+            } else if (roll < 0.8975) {
+              // 3.75% chance - Ornate pin (rare)
               if (pinSprite.complete && pinSprite.naturalWidth > 0) {
                 return tryAddReward('Ornate pin', pinSprite);
               }
-            } else if (roll < 0.87) {
-              // 7.5% chance - Canteen (rare)
+            } else if (roll < 0.935) {
+              // 3.75% chance - Canteen (rare)
               if (canteenSprite.complete && canteenSprite.naturalWidth > 0) {
                 return tryAddReward('Canteen', canteenSprite);
               }
-            } else if (roll < 0.91) {
-              // 4% chance - Arrowhead (super rare)
+            } else if (roll < 0.955) {
+              // 2% chance - Arrowhead (super rare)
               if (
                 arrowheadSprite.complete &&
                 arrowheadSprite.naturalWidth > 0
               ) {
                 return tryAddReward('Arrowhead', arrowheadSprite);
               }
-            } else if (roll < 0.95) {
-              // 4% chance - Cannon Shards (super rare)
+            } else if (roll < 0.975) {
+              // 2% chance - Cannon Shards (super rare)
               if (
                 cannonShardsSprite.complete &&
                 cannonShardsSprite.naturalWidth > 0
               ) {
                 return tryAddReward('Cannon Shards', cannonShardsSprite);
               }
-            } else {
-              // 5% chance - Cannon (legendary)
-              if (cannonSprite.complete && cannonSprite.naturalWidth > 0) {
+            } else if (roll < 0.9875) {
+              // 1.25% chance - Cannon (legendary)
+              // But only if the player/museum doesn't already have one.
+              if (
+                cannonSprite.complete &&
+                cannonSprite.naturalWidth > 0 &&
+                !playerOrMuseumHasCannon()
+              ) {
                 return tryAddReward('Cannon', cannonSprite);
+              }
+              // If we already have a Cannon, fall back to Cartridge instead.
+              if (
+                cartridgeSprite.complete &&
+                cartridgeSprite.naturalWidth > 0
+              ) {
+                return tryAddReward('Cartridge', cartridgeSprite);
+              }
+            } else {
+              // 1.25% chance - Cartridge (legendary, unlimited)
+              if (
+                cartridgeSprite.complete &&
+                cartridgeSprite.naturalWidth > 0
+              ) {
+                return tryAddReward('Cartridge', cartridgeSprite);
               }
             }
           }
@@ -3908,7 +4552,8 @@
               brushingMinigame.redTriggerTime = 2 + Math.random() * 2; // 2-4 seconds
               brushingMinigame.perfectReleaseWindow = 0.75; // 0.75 seconds (instead of 0.5)
             } else {
-              brushingMinigame.redTriggerTime = 2 + Math.random() * 3; // 2-5 seconds (reduced from 3-8)
+              // Randomly choose between 3-7 second interval for turning red
+              brushingMinigame.redTriggerTime = 3 + Math.random() * 4; // 3-7 seconds
               brushingMinigame.perfectReleaseWindow = 0.5; // 0.5 seconds
             }
             brushingMinigame.timeSinceRed = 0;
@@ -3992,6 +4637,26 @@
               // Real version (no typos)
               typoMinigame.testExcerpt = typoMinigame.realExcerpt;
             }
+          } else if (crouchAnimation.pendingMinigame === 'quiz') {
+            // Start Quiz minigame - randomly select a question
+            quizMinigame.active = true;
+            quizMinigame.tileRow = row;
+            quizMinigame.tileCol = col;
+            quizMinigame.isSecretX = crouchAnimation.isSecretX;
+            quizMinigame.answered = false;
+            // Show instructions automatically on first time
+            if (!quizMinigame.hasStartedFirstTime) {
+              quizMinigame.showInstructions = true;
+              quizMinigame.hasStartedFirstTime = true;
+            }
+
+            // Randomly select a question
+            const selectedQuestion =
+              quizQuestions[
+                Math.floor(Math.random() * quizQuestions.length)
+              ];
+            quizMinigame.question = selectedQuestion.question;
+            quizMinigame.correctAnswer = selectedQuestion.correctAnswer;
           }
 
           // Reset crouch animation
@@ -4170,6 +4835,15 @@
               if (artifact) {
                 startCelebrationAnimation(artifact);
               }
+
+              // Advance time by 10 seconds when minigame completes
+              // This makes the game progress faster
+              dayTime.hourTimer += 10;
+              // Check if we've advanced past an hour boundary
+              if (dayTime.hourTimer >= dayTime.secondsPerHour) {
+                dayTime.currentHour++;
+                dayTime.hourTimer -= dayTime.secondsPerHour;
+              }
             }
 
             // Tile already converted to grass when interacted with
@@ -4233,6 +4907,15 @@
             if (artifact) {
               startCelebrationAnimation(artifact);
             }
+
+            // Advance time by 10 seconds when minigame completes
+            // This makes the game progress faster
+            dayTime.hourTimer += 10;
+            // Check if we've advanced past an hour boundary
+            if (dayTime.hourTimer >= dayTime.secondsPerHour) {
+              dayTime.currentHour++;
+              dayTime.hourTimer -= dayTime.secondsPerHour;
+            }
           }
 
           // Tile already converted to grass when interacted with
@@ -4251,6 +4934,85 @@
           }
 
           // Minigame logic is handled by key presses, no continuous updates needed
+        }
+
+        // Handle quiz minigame answer
+        // playerSaidYes: true if player clicked Yes, false if clicked No
+        function handleQuizAnswer(playerSaidYes) {
+          if (quizMinigame.answered) return; // Already answered
+
+          // Prevent interaction when tutorial popup is active
+          if (tutorial.active && dayTime.currentDay === 0) {
+            return;
+          }
+
+          quizMinigame.answered = true;
+
+          // Check if player was correct
+          // Player said Yes (true) and correct answer is Yes (true) = correct
+          // Player said No (false) and correct answer is No (false) = correct
+          const isCorrect = playerSaidYes === quizMinigame.correctAnswer;
+
+          quizMinigame.wasCorrect = isCorrect;
+
+          let actualReward = 0;
+          if (isCorrect) {
+            let multiplier = 1.0;
+            if (inventory.equipment) {
+              if (inventory.equipment.tier === 1)
+                multiplier = 1.5; // Simple shovel
+              else if (inventory.equipment.tier === 2)
+                multiplier = 2.0; // Iron shovel
+              else if (inventory.equipment.tier === 3)
+                multiplier = 2.5; // Steel shovel
+              else if (inventory.equipment.tier === 4)
+                multiplier = 3.0; // Diamond shovel
+              else if (inventory.equipment.tier === 5) multiplier = 4.0; // Legendary shovel
+            }
+            // Apply 1.5x multiplier for secret X tiles
+            if (quizMinigame.isSecretX) {
+              multiplier *= 1.5;
+            }
+            actualReward = Math.round(quizMinigame.baseReward * multiplier);
+          } else {
+            actualReward = 0;
+          }
+
+          quizMinigame.actualReward = actualReward;
+
+          // Give minigame reward (bullets or grapeshot) when answered correctly
+          if (isCorrect) {
+            const artifact = giveMinigameReward();
+            if (artifact) {
+              startCelebrationAnimation(artifact);
+            }
+
+            // Advance time by 10 seconds when minigame completes
+            // This makes the game progress faster
+            dayTime.hourTimer += 10;
+            // Check if we've advanced past an hour boundary
+            if (dayTime.hourTimer >= dayTime.secondsPerHour) {
+              dayTime.currentHour++;
+              dayTime.hourTimer -= dayTime.secondsPerHour;
+            }
+          }
+
+          // Tile already converted to grass when interacted with
+          // Close minigame after a short delay to show result
+          setTimeout(() => {
+            quizMinigame.active = false;
+          }, 1000); // 1 second delay to show result
+        }
+
+        function updateQuizMinigame(dtMs) {
+          if (!quizMinigame.active) return;
+
+          // Prevent interaction when tutorial popup is active
+          if (tutorial.active && dayTime.currentDay === 0) {
+            return;
+          }
+
+          // Minigame logic is handled by button clicks, no continuous updates needed
         }
 
         // Minesweeper helper functions
@@ -4354,15 +5116,19 @@
 
           const size = minesweeper.gridSize;
           let revealedCount = 0;
+          // Count all revealed cells (excluding mines)
           for (let i = 0; i < size; i++) {
             for (let j = 0; j < size; j++) {
-              if (minesweeper.revealed[i][j]) revealedCount++;
+              // Only count non-mine cells that are revealed
+              if (minesweeper.revealed[i][j] && !minesweeper.grid[i][j]) {
+                revealedCount++;
+              }
             }
           }
           // Win if all non-mine cells are revealed
           const totalCells = size * size;
           const nonMineCells = totalCells - minesweeper.mineCount;
-          if (revealedCount === nonMineCells) {
+          if (revealedCount >= nonMineCells) {
             minesweeper.won = true;
           }
         }
@@ -4410,6 +5176,12 @@
         function updateMinesweeperMinigame(dtMs) {
           if (!minesweeperMinigame.active) return;
 
+          // Check win condition every frame as a backup (in case revealCell missed it)
+          // This ensures the game properly detects when all non-mine tiles are revealed
+          if (!minesweeperMinigame.gameOver && !minesweeperMinigame.won) {
+            checkMinesweeperWin(minesweeperMinigame);
+          }
+
           // If game over or won, wait a bit then close
           if (minesweeperMinigame.gameOver || minesweeperMinigame.won) {
             // Close after a delay to show result
@@ -4420,6 +5192,16 @@
                 if (artifact) {
                   startCelebrationAnimation(artifact);
                 }
+
+                // Advance time by 10 seconds when minigame completes
+                // This makes the game progress faster
+                dayTime.hourTimer += 10;
+                // Check if we've advanced past an hour boundary
+                if (dayTime.hourTimer >= dayTime.secondsPerHour) {
+                  dayTime.currentHour++;
+                  dayTime.hourTimer -= dayTime.secondsPerHour;
+                }
+
                 // Tile already converted to grass when interacted with
               }
 
@@ -4654,6 +5436,7 @@
           radarSpriteDown,
           radarRingSprite,
           treeSprite,
+          trophySprite,
         ];
 
         // Radar system
@@ -5250,7 +6033,7 @@
             const displayCase = museum.displayCases[i];
             const caseX = displayCase.col * museumTileSize;
             const caseY = displayCase.row * museumTileSize;
-            const displaySize = Math.round(museumTileSize * 1.1);
+            const displaySize = Math.round(museumTileSize * 1.265); // Increased by 15% (1.1 * 1.15 = 1.265)
             const displayOffset = (displaySize - museumTileSize) / 2;
 
             // Draw display case sprite
@@ -5278,13 +6061,33 @@
             if (displayCase.artifact && displayCase.artifact.sprite) {
               const sprite = displayCase.artifact.sprite;
               if (sprite.complete && sprite.naturalWidth > 0) {
-                ctx.drawImage(
-                  sprite,
-                  caseX + 4 - displayOffset,
-                  caseY + 4 - displayOffset,
-                  displaySize - 8,
-                  displaySize - 8
-                );
+                const artifactSize = displaySize - 8;
+                const artifactX = caseX + 4 - displayOffset;
+                const artifactY = caseY + 4 - displayOffset;
+
+                // Special handling for Arrowhead - rotate 90 degrees
+                if (displayCase.artifact.name === 'Arrowhead') {
+                  ctx.save();
+                  ctx.translate(artifactX + artifactSize / 2, artifactY + artifactSize / 2);
+                  ctx.rotate(Math.PI / 2); // 90 degrees
+                  ctx.imageSmoothingEnabled = false;
+                  ctx.drawImage(
+                    sprite,
+                    -artifactSize / 2,
+                    -artifactSize / 2,
+                    artifactSize,
+                    artifactSize
+                  );
+                  ctx.restore();
+                } else {
+                  ctx.drawImage(
+                    sprite,
+                    artifactX,
+                    artifactY,
+                    artifactSize,
+                    artifactSize
+                  );
+                }
               }
             }
           }
@@ -5730,13 +6533,29 @@
             if (artifactSprite.complete && artifactSprite.naturalWidth > 0) {
               ctx.imageSmoothingEnabled = false;
               const artifactSize = 40; // Size of artifact sprite (increased from 24 for more visibility)
-              ctx.drawImage(
-                artifactSprite,
-                artifactX - artifactSize / 2,
-                artifactY - artifactSize / 2,
-                artifactSize,
-                artifactSize
-              );
+
+              // Special handling for Arrowhead - rotate 90 degrees
+              if (artifact.name === 'Arrowhead') {
+                ctx.save();
+                ctx.translate(artifactX, artifactY);
+                ctx.rotate(Math.PI / 2); // 90 degrees
+                ctx.drawImage(
+                  artifactSprite,
+                  -artifactSize / 2,
+                  -artifactSize / 2,
+                  artifactSize,
+                  artifactSize
+                );
+                ctx.restore();
+              } else {
+                ctx.drawImage(
+                  artifactSprite,
+                  artifactX - artifactSize / 2,
+                  artifactY - artifactSize / 2,
+                  artifactSize,
+                  artifactSize
+                );
+              }
             }
           }
 
@@ -6528,6 +7347,282 @@
             ctx.restore();
           }
 
+          // Draw Quiz minigame
+          if (quizMinigame.active) {
+            ctx.save();
+
+            // Background overlay
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Minigame panel
+            const panelWidth = 700;
+            const panelHeight = 500;
+            const panelX = (canvas.width - panelWidth) / 2;
+            const panelY = (canvas.height - panelHeight) / 2;
+
+            ctx.fillStyle = 'rgba(8, 16, 12, 0.95)';
+            ctx.fillRect(panelX, panelY, panelWidth, panelHeight);
+
+            ctx.strokeStyle = '#ffffff'; // White menu borders
+            ctx.lineWidth = 3;
+            ctx.strokeRect(panelX, panelY, panelWidth, panelHeight);
+
+            // Title
+            ctx.fillStyle = '#ffffff';
+            ctx.font = 'bold 24px ui-monospace, Menlo, Consolas, monospace';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'top';
+            ctx.fillText(
+              'Quiz',
+              Math.round(canvas.width / 2),
+              Math.round(panelY + 20)
+            );
+
+            // Question text
+            ctx.fillStyle = '#ffffff';
+            ctx.font = '20px ui-monospace, Menlo, Consolas, monospace';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'top';
+
+            // Word wrap for question text
+            const questionWords = quizMinigame.question.split(' ');
+            const textWidth = panelWidth - 80;
+            const textX = panelX + panelWidth / 2;
+            let questionLine = '';
+            // Calculate total question height to center it vertically
+            let totalQuestionHeight = 0;
+            let testLine = '';
+            for (let i = 0; i < questionWords.length; i++) {
+              const testLine2 = testLine + questionWords[i] + ' ';
+              const metrics = ctx.measureText(testLine2);
+              if (metrics.width > textWidth && i > 0) {
+                totalQuestionHeight += 28;
+                testLine = questionWords[i] + ' ';
+              } else {
+                testLine = testLine2;
+              }
+            }
+            totalQuestionHeight += 28; // Last line
+            // Center question vertically in the panel (between title and buttons)
+            const availableHeight = panelHeight - 100 - 120; // Title area and button area
+            let questionY = panelY + 100 + (availableHeight - totalQuestionHeight) / 2;
+            for (let i = 0; i < questionWords.length; i++) {
+              const testLine = questionLine + questionWords[i] + ' ';
+              const metrics = ctx.measureText(testLine);
+              if (metrics.width > textWidth && i > 0) {
+                ctx.fillText(questionLine, Math.round(textX), Math.round(questionY));
+                questionLine = questionWords[i] + ' ';
+                questionY += 28;
+              } else {
+                questionLine = testLine;
+              }
+            }
+            ctx.fillText(questionLine, Math.round(textX), Math.round(questionY));
+
+            // Buttons
+            if (!quizMinigame.answered) {
+              const buttonY = panelY + panelHeight - 80;
+              const buttonWidth = 150;
+              const buttonHeight = 40;
+              const buttonSpacing = 20;
+              const totalButtonWidth = buttonWidth * 2 + buttonSpacing;
+              const buttonStartX = canvas.width / 2 - totalButtonWidth / 2;
+
+              // Yes button (left) - brighter green
+              const yesButtonX = buttonStartX;
+              // Check if mouse is hovering over Yes button
+              const isHoveringYes =
+                mouseX >= yesButtonX &&
+                mouseX <= yesButtonX + buttonWidth &&
+                mouseY >= buttonY &&
+                mouseY <= buttonY + buttonHeight;
+
+              // Use brighter color when hovering
+              ctx.fillStyle = isHoveringYes
+                ? 'rgba(0, 255, 0, 1.0)' // Even brighter green on hover
+                : 'rgba(0, 200, 0, 0.9)'; // Brighter green
+              ctx.fillRect(
+                Math.round(yesButtonX),
+                Math.round(buttonY),
+                buttonWidth,
+                buttonHeight
+              );
+              ctx.strokeStyle = '#ffffff'; // White border
+              ctx.lineWidth = 2;
+              ctx.strokeRect(
+                Math.round(yesButtonX),
+                Math.round(buttonY),
+                buttonWidth,
+                buttonHeight
+              );
+              ctx.fillStyle = '#ffffff';
+              ctx.font = 'bold 18px ui-monospace, Menlo, Consolas, monospace';
+              ctx.textAlign = 'center';
+              ctx.textBaseline = 'middle';
+              ctx.fillText(
+                'Yes',
+                Math.round(yesButtonX + buttonWidth / 2),
+                Math.round(buttonY + buttonHeight / 2)
+              );
+
+              // No button (right) - brighter red
+              const noButtonX = buttonStartX + buttonWidth + buttonSpacing;
+              // Check if mouse is hovering over No button
+              const isHoveringNo =
+                mouseX >= noButtonX &&
+                mouseX <= noButtonX + buttonWidth &&
+                mouseY >= buttonY &&
+                mouseY <= buttonY + buttonHeight;
+
+              // Use brighter color when hovering
+              ctx.fillStyle = isHoveringNo
+                ? 'rgba(255, 0, 0, 1.0)' // Even brighter red on hover
+                : 'rgba(200, 0, 0, 0.9)'; // Brighter red
+              ctx.fillRect(
+                Math.round(noButtonX),
+                Math.round(buttonY),
+                buttonWidth,
+                buttonHeight
+              );
+              ctx.strokeStyle = '#ffffff'; // White border
+              ctx.lineWidth = 2;
+              ctx.strokeRect(
+                Math.round(noButtonX),
+                Math.round(buttonY),
+                buttonWidth,
+                buttonHeight
+              );
+              ctx.fillStyle = '#ffffff';
+              ctx.font = 'bold 18px ui-monospace, Menlo, Consolas, monospace';
+              ctx.textAlign = 'center';
+              ctx.textBaseline = 'middle';
+              ctx.fillText(
+                'No',
+                Math.round(noButtonX + buttonWidth / 2),
+                Math.round(buttonY + buttonHeight / 2)
+              );
+            } else {
+              let resultText = '';
+              let resultColor = '#ffffff';
+
+              if (quizMinigame.wasCorrect) {
+                resultText = 'Correct!';
+                resultColor = '#00ff00';
+              } else {
+                resultText = 'Incorrect!';
+                resultColor = '#ff0000';
+              }
+
+              ctx.fillStyle = resultColor;
+              ctx.font = 'bold 20px ui-monospace, Menlo, Consolas, monospace';
+              ctx.textAlign = 'center';
+              ctx.textBaseline = 'middle';
+              ctx.fillText(
+                resultText,
+                Math.round(canvas.width / 2),
+                Math.round(panelY + panelHeight - 60)
+              );
+            }
+
+            // Question mark in bottom left - clickable to show instructions
+            const questionMarkSize = 34;
+            const questionMarkX = 15;
+            const questionMarkY = canvas.height - 15;
+            const questionMarkPadding = 6;
+            const questionMarkCenterX = questionMarkX + questionMarkSize / 2;
+            const questionMarkCenterY = questionMarkY - questionMarkSize / 2;
+            const questionMarkRadius = questionMarkSize / 2 + 6;
+            const isHoveringQuestionMark =
+              mouseX >= questionMarkX - questionMarkPadding &&
+              mouseX <= questionMarkX + questionMarkSize + questionMarkPadding &&
+              mouseY >= questionMarkY - questionMarkSize - questionMarkPadding &&
+              mouseY <= questionMarkY + questionMarkPadding;
+
+            // Draw a small badge so the icon is more obvious
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+            ctx.beginPath();
+            ctx.arc(
+              questionMarkCenterX,
+              questionMarkCenterY,
+              questionMarkRadius,
+              0,
+              Math.PI * 2
+            );
+            ctx.fill();
+            ctx.strokeStyle = isHoveringQuestionMark ? '#ffff66' : '#ffffff';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+            // Draw the question mark
+            ctx.fillStyle = isHoveringQuestionMark ? '#ffff66' : '#ffffff';
+            ctx.font = 'bold 32px ui-monospace, Menlo, Consolas, monospace';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('?', questionMarkCenterX, questionMarkCenterY + 1);
+
+            // Draw instructions if question mark was clicked
+            if (quizMinigame.showInstructions) {
+              const instructionsPanelWidth = 600;
+              const instructionsPanelHeight = 240;
+              const instructionsPanelX =
+                (canvas.width - instructionsPanelWidth) / 2;
+              const instructionsPanelY =
+                (canvas.height - instructionsPanelHeight) / 2;
+
+              // Background
+              ctx.fillStyle = 'rgba(0, 0, 0, 0.9)';
+              ctx.fillRect(
+                instructionsPanelX,
+                instructionsPanelY,
+                instructionsPanelWidth,
+                instructionsPanelHeight
+              );
+
+              // Border
+              ctx.strokeStyle = '#ffffff';
+              ctx.lineWidth = 2;
+              ctx.strokeRect(
+                instructionsPanelX,
+                instructionsPanelY,
+                instructionsPanelWidth,
+                instructionsPanelHeight
+              );
+
+              // Instructions text
+              ctx.fillStyle = '#ffffff';
+              ctx.font = 'bold 18px ui-monospace, Menlo, Consolas, monospace';
+              ctx.textAlign = 'center';
+              ctx.textBaseline = 'top';
+
+              const instructions = [
+                'Quiz Instructions',
+                '',
+                'Answer the yes or no questions with what you think is the best answer.',
+                'Answer the question correctly to get rewards!',
+                'Try to remember the answer for if you get the question again.',
+              ];
+
+              // Calculate total text height to center it vertically
+              const titleHeight = 30;
+              const lineHeight = 22;
+              const totalTextHeight = titleHeight + (instructions.length - 1) * lineHeight;
+              const startY = instructionsPanelY + (instructionsPanelHeight - totalTextHeight) / 2;
+
+              let textY = startY;
+              for (let i = 0; i < instructions.length; i++) {
+                ctx.font =
+                  i === 0
+                    ? 'bold 18px ui-monospace, Menlo, Consolas, monospace'
+                    : '14px ui-monospace, Menlo, Consolas, monospace';
+                ctx.fillText(instructions[i], canvas.width / 2, textY);
+                textY += i === 0 ? titleHeight : lineHeight;
+              }
+            }
+
+            ctx.restore();
+          }
+
           // Draw Minesweeper minigame
           if (minesweeperMinigame.active) {
             ctx.save();
@@ -6896,6 +7991,33 @@
 
             // Week end screen (museum ending rank)
             const endingRank = getMuseumEndingRank();
+            
+            // Check and unlock ending achievements
+            if (endingRank.name === 'Nothing') {
+              const nothingAchievement = achievements.list.find(a => a.id === 'nothing');
+              if (nothingAchievement && !nothingAchievement.completed) {
+                nothingAchievement.completed = true;
+                saveAchievements(); // Save achievements when unlocked
+              }
+            } else if (endingRank.name === 'Below Average') {
+              const consolationAchievement = achievements.list.find(a => a.id === 'consolation_prize');
+              if (consolationAchievement && !consolationAchievement.completed) {
+                consolationAchievement.completed = true;
+                saveAchievements(); // Save achievements when unlocked
+              }
+            } else if (endingRank.name === 'Average') {
+              const classicAchievement = achievements.list.find(a => a.id === 'classic');
+              if (classicAchievement && !classicAchievement.completed) {
+                classicAchievement.completed = true;
+                saveAchievements(); // Save achievements when unlocked
+              }
+            } else if (endingRank.name === 'Above Average') {
+              const overachieverAchievement = achievements.list.find(a => a.id === 'overachiever');
+              if (overachieverAchievement && !overachieverAchievement.completed) {
+                overachieverAchievement.completed = true;
+                saveAchievements(); // Save achievements when unlocked
+              }
+            }
 
             ctx.fillStyle = '#e8eaf6';
             ctx.font = 'bold 26px ui-monospace, Menlo, Consolas, monospace';
@@ -7451,13 +8573,27 @@
                     const spriteSize = slotSize - 8; // Leave padding
                     const spriteX = slotX + (slotSize - spriteSize) / 2;
                     const spriteY = slotY + (slotSize - spriteSize) / 2;
-                    ctx.drawImage(
-                      item.sprite,
-                      spriteX,
-                      spriteY,
-                      spriteSize,
-                      spriteSize
-                    );
+
+                    // Special handling for Arrowhead - rotate 90 degrees
+                    if (item.name === 'Arrowhead') {
+                      ctx.translate(spriteX + spriteSize / 2, spriteY + spriteSize / 2);
+                      ctx.rotate(Math.PI / 2); // 90 degrees
+                      ctx.drawImage(
+                        item.sprite,
+                        -spriteSize / 2,
+                        -spriteSize / 2,
+                        spriteSize,
+                        spriteSize
+                      );
+                    } else {
+                      ctx.drawImage(
+                        item.sprite,
+                        spriteX,
+                        spriteY,
+                        spriteSize,
+                        spriteSize
+                      );
+                    }
                   }
                   ctx.restore();
                 }
@@ -7600,7 +8736,7 @@
 
           // Red X button for deleting artifacts (to the right of inventory panel)
           const deleteButtonSize = 40;
-          const deleteButtonX = panelX + inventoryWidth + 20; // 20px spacing from inventory
+          const deleteButtonX = panelX + inventoryWidth + 60; // 60px spacing from inventory (moved right)
           const deleteButtonY = panelY + titleHeight; // Align with top of artifact slots
 
           // Check if hovering over delete button
@@ -7711,6 +8847,8 @@
             panelHeight,
             slotsStartX,
             slotsStartY,
+            titleHeight,
+            inventoryWidth: panelWidth, // Alias for compatibility
           };
         }
 
@@ -7958,13 +9096,27 @@
                 const spriteSize = layout.slotSize - 6;
                 const spriteX = slotX + (layout.slotSize - spriteSize) / 2;
                 const spriteY = slotY + (layout.slotSize - spriteSize) / 2;
-                ctx.drawImage(
-                  item.sprite,
-                  spriteX,
-                  spriteY,
-                  spriteSize,
-                  spriteSize
-                );
+
+                // Special handling for Arrowhead - rotate 90 degrees
+                if (item.name === 'Arrowhead') {
+                  ctx.translate(spriteX + spriteSize / 2, spriteY + spriteSize / 2);
+                  ctx.rotate(Math.PI / 2); // 90 degrees
+                  ctx.drawImage(
+                    item.sprite,
+                    -spriteSize / 2,
+                    -spriteSize / 2,
+                    spriteSize,
+                    spriteSize
+                  );
+                } else {
+                  ctx.drawImage(
+                    item.sprite,
+                    spriteX,
+                    spriteY,
+                    spriteSize,
+                    spriteSize
+                  );
+                }
               }
               ctx.restore();
             }
@@ -8202,7 +9354,66 @@
           // Button text
           ctx.fillStyle = '#e8eaf6';
           ctx.font = '24px ui-monospace, Menlo, Consolas, monospace';
-          ctx.fillText('PLAY', buttonX, buttonY);
+          ctx.fillText('Play', buttonX, buttonY);
+
+          // Achievements button (under play button)
+          const achievementsButtonX = canvas.width / 2;
+          const achievementsButtonY = canvas.height / 2 + 120;
+          const achievementsButtonWidth = 200;
+          const achievementsButtonHeight = 60;
+
+          // Back button (under achievements button)
+          const backButtonX = canvas.width / 2;
+          const backButtonY = canvas.height / 2 + 200;
+          const backButtonWidth = 200;
+          const backButtonHeight = 60;
+
+          // Check if mouse is hovering over achievements button
+          const isHoveringAchievements =
+            mouseX >= achievementsButtonX - achievementsButtonWidth / 2 &&
+            mouseX <= achievementsButtonX + achievementsButtonWidth / 2 &&
+            mouseY >= achievementsButtonY - achievementsButtonHeight / 2 &&
+            mouseY <= achievementsButtonY + achievementsButtonHeight / 2;
+
+          // Button background (rounded rectangle) - brighter when hovering
+          ctx.fillStyle = isHoveringAchievements ? '#1f2f4a' : '#15193a'; // Brighter on hover
+          ctx.strokeStyle = isHoveringAchievements ? '#3b4f6f' : '#2b2f55'; // Brighter border on hover
+          ctx.lineWidth = 3;
+          const achievementsBtnX = achievementsButtonX - achievementsButtonWidth / 2;
+          const achievementsBtnY = achievementsButtonY - achievementsButtonHeight / 2;
+          ctx.beginPath();
+          ctx.moveTo(achievementsBtnX + radius, achievementsBtnY);
+          ctx.lineTo(achievementsBtnX + achievementsButtonWidth - radius, achievementsBtnY);
+          ctx.quadraticCurveTo(
+            achievementsBtnX + achievementsButtonWidth,
+            achievementsBtnY,
+            achievementsBtnX + achievementsButtonWidth,
+            achievementsBtnY + radius
+          );
+          ctx.lineTo(achievementsBtnX + achievementsButtonWidth, achievementsBtnY + achievementsButtonHeight - radius);
+          ctx.quadraticCurveTo(
+            achievementsBtnX + achievementsButtonWidth,
+            achievementsBtnY + achievementsButtonHeight,
+            achievementsBtnX + achievementsButtonWidth - radius,
+            achievementsBtnY + achievementsButtonHeight
+          );
+          ctx.lineTo(achievementsBtnX + radius, achievementsBtnY + achievementsButtonHeight);
+          ctx.quadraticCurveTo(
+            achievementsBtnX,
+            achievementsBtnY + achievementsButtonHeight,
+            achievementsBtnX,
+            achievementsBtnY + achievementsButtonHeight - radius
+          );
+          ctx.lineTo(achievementsBtnX, achievementsBtnY + radius);
+          ctx.quadraticCurveTo(achievementsBtnX, achievementsBtnY, achievementsBtnX + radius, achievementsBtnY);
+          ctx.closePath();
+          ctx.fill();
+          ctx.stroke();
+
+          // Button text
+          ctx.fillStyle = '#e8eaf6';
+          ctx.font = '24px ui-monospace, Menlo, Consolas, monospace';
+          ctx.fillText('Achievements', achievementsButtonX, achievementsButtonY);
 
           // Credits text
           ctx.fillStyle = '#a0a0a0'; // Lighter gray for credits
@@ -8214,6 +9425,397 @@
             canvas.width / 2,
             canvas.height - 20
           );
+        }
+
+        // Achievements screen rendering
+        function drawAchievementsScreen() {
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+          // Save current camera position
+          const savedCameraX = camera.x;
+          const savedCameraY = camera.y;
+
+          // Calculate smooth circular camera position
+          const camX =
+            titleScreenCamera.centerX +
+            Math.cos(titleScreenCamera.angle) * titleScreenCamera.radiusX;
+          const camY =
+            titleScreenCamera.centerY +
+            Math.sin(titleScreenCamera.angle) * titleScreenCamera.radiusY;
+
+          // Set camera to title screen camera position for background rendering
+          camera.x = camX;
+          camera.y = camY;
+
+          // Draw game world background (tiles, grid, flora) - no NPCs, player, or radar
+          ctx.save();
+          // World space: translate so that camera is centered
+          ctx.translate(
+            Math.round(canvas.width / 2 - camera.x),
+            Math.round(canvas.height / 2 - camera.y)
+          );
+
+          // Draw background elements only
+          drawTiles();
+          drawFlora();
+
+          ctx.restore();
+
+          // Restore camera position
+          camera.x = savedCameraX;
+          camera.y = savedCameraY;
+
+          // Draw semi-transparent overlay to darken background slightly and make text readable
+          ctx.fillStyle = 'rgba(15, 26, 18, 0.6)'; // Dark green overlay with transparency
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+          // Title text
+          ctx.fillStyle = '#e8eaf6';
+          ctx.font = 'bold 48px ui-monospace, Menlo, Consolas, monospace';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(
+            'Achievements',
+            canvas.width / 2,
+            60
+          );
+
+          // Back button (top left, same style as title screen)
+          const backButtonX = 50;
+          const backButtonY = 30;
+          const backButtonWidth = 120;
+          const backButtonHeight = 40;
+
+          // Check if mouse is hovering over back button
+          const isHoveringBack =
+            mouseX >= backButtonX - backButtonWidth / 2 &&
+            mouseX <= backButtonX + backButtonWidth / 2 &&
+            mouseY >= backButtonY - backButtonHeight / 2 &&
+            mouseY <= backButtonY + backButtonHeight / 2;
+
+          // Button background (rounded rectangle) - brighter when hovering
+          ctx.fillStyle = isHoveringBack ? '#1f2f4a' : '#15193a';
+          ctx.strokeStyle = isHoveringBack ? '#3b4f6f' : '#2b2f55';
+          ctx.lineWidth = 3;
+          const backRadius = 6;
+          const backBtnX = backButtonX - backButtonWidth / 2;
+          const backBtnY = backButtonY - backButtonHeight / 2;
+          ctx.beginPath();
+          ctx.moveTo(backBtnX + backRadius, backBtnY);
+          ctx.lineTo(backBtnX + backButtonWidth - backRadius, backBtnY);
+          ctx.quadraticCurveTo(backBtnX + backButtonWidth, backBtnY, backBtnX + backButtonWidth, backBtnY + backRadius);
+          ctx.lineTo(backBtnX + backButtonWidth, backBtnY + backButtonHeight - backRadius);
+          ctx.quadraticCurveTo(backBtnX + backButtonWidth, backBtnY + backButtonHeight, backBtnX + backButtonWidth - backRadius, backBtnY + backButtonHeight);
+          ctx.lineTo(backBtnX + backRadius, backBtnY + backButtonHeight);
+          ctx.quadraticCurveTo(backBtnX, backBtnY + backButtonHeight, backBtnX, backBtnY + backButtonHeight - backRadius);
+          ctx.lineTo(backBtnX, backBtnY + backRadius);
+          ctx.quadraticCurveTo(backBtnX, backBtnY, backBtnX + backRadius, backBtnY);
+          ctx.closePath();
+          ctx.fill();
+          ctx.stroke();
+
+          // Button text
+          ctx.fillStyle = '#e8eaf6';
+          ctx.font = '18px ui-monospace, Menlo, Consolas, monospace';
+          ctx.fillText('Back', backButtonX, backButtonY);
+
+          // Draw achievements list (smaller, in a grid)
+          const startY = 120;
+          const trophySize = 35; // Smaller trophies
+          const achievementSpacingX = 200; // Horizontal spacing
+          const achievementSpacingY = 70; // Vertical spacing (smaller)
+          const achievementsPerRow = 3;
+          const trophyX = 80;
+
+          for (let i = 0; i < achievements.list.length; i++) {
+            const achievement = achievements.list[i];
+            const row = Math.floor(i / achievementsPerRow);
+            const col = i % achievementsPerRow;
+            const trophyXPos = trophyX + col * achievementSpacingX;
+            const trophyYPos = startY + row * achievementSpacingY;
+
+            // Draw achievement icon (trophy, radar, or cannon)
+            // Determine which sprite to use based on achievement iconType
+            let iconSprite = trophySprite; // Default to trophy
+            if (achievement.iconType === 'radar') {
+              iconSprite = radarIconSprite;
+            } else if (achievement.iconType === 'cannon') {
+              iconSprite = cannonIconSprite;
+            }
+
+            ctx.save();
+            ctx.imageSmoothingEnabled = false;
+
+            // Check if the appropriate sprite is loaded
+            if (iconSprite.complete && iconSprite.naturalWidth > 0) {
+              if (achievement.completed) {
+                // Draw icon normally (colored)
+                ctx.globalAlpha = 1.0;
+                ctx.drawImage(
+                  iconSprite,
+                  trophyXPos - trophySize / 2,
+                  trophyYPos - trophySize / 2,
+                  trophySize,
+                  trophySize
+                );
+              } else {
+                // Draw icon as silhouette (very dark, almost black)
+                // Use a dark fill to create silhouette effect
+                ctx.globalAlpha = 1.0;
+                ctx.fillStyle = '#000000'; // Black silhouette
+                ctx.fillRect(
+                  trophyXPos - trophySize / 2,
+                  trophyYPos - trophySize / 2,
+                  trophySize,
+                  trophySize
+                );
+                // Draw icon sprite with multiply blend mode to create dark silhouette
+                ctx.globalCompositeOperation = 'multiply';
+                ctx.globalAlpha = 0.3; // Very dark
+                ctx.drawImage(
+                  iconSprite,
+                  trophyXPos - trophySize / 2,
+                  trophyYPos - trophySize / 2,
+                  trophySize,
+                  trophySize
+                );
+                ctx.globalCompositeOperation = 'source-over';
+                ctx.globalAlpha = 1.0;
+              }
+            } else {
+              // Fallback: simple shape if sprite not loaded
+              ctx.fillStyle = achievement.completed ? '#ffd700' : '#333333';
+              ctx.fillRect(
+                trophyXPos - trophySize / 2,
+                trophyYPos - trophySize / 2,
+                trophySize,
+                trophySize
+              );
+            }
+            ctx.restore();
+
+            // Draw achievement name and description
+            // Names are always visible, descriptions show "???" when locked
+            const nameText = achievement.name; // Always show name
+            const descText = achievement.completed ? achievement.description : '???';
+
+            ctx.fillStyle = achievement.completed ? '#ffd700' : '#888888';
+            ctx.font = 'bold 16px ui-monospace, Menlo, Consolas, monospace';
+            ctx.textAlign = 'left';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(nameText, trophyXPos + trophySize / 2 + 10, trophyYPos - 8);
+
+            ctx.fillStyle = achievement.completed ? '#ffffff' : '#666666';
+            ctx.font = '12px ui-monospace, Menlo, Consolas, monospace';
+            ctx.fillText(descText, trophyXPos + trophySize / 2 + 10, trophyYPos + 10);
+          }
+        }
+
+        // Save slot selection screen rendering
+        // Shows 3 save slots that the player can choose from
+        function drawSaveSelectScreen() {
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+          // Save current camera position
+          const savedCameraX = camera.x;
+          const savedCameraY = camera.y;
+
+          // Calculate smooth circular camera position
+          const camX =
+            titleScreenCamera.centerX +
+            Math.cos(titleScreenCamera.angle) * titleScreenCamera.radiusX;
+          const camY =
+            titleScreenCamera.centerY +
+            Math.sin(titleScreenCamera.angle) * titleScreenCamera.radiusY;
+
+          // Set camera to title screen camera position for background rendering
+          camera.x = camX;
+          camera.y = camY;
+
+          // Draw game world background
+          ctx.save();
+          ctx.translate(
+            Math.round(canvas.width / 2 - camera.x),
+            Math.round(canvas.height / 2 - camera.y)
+          );
+          drawTiles();
+          drawFlora();
+          ctx.restore();
+
+          // Restore camera position
+          camera.x = savedCameraX;
+          camera.y = savedCameraY;
+
+          // Draw semi-transparent overlay
+          ctx.fillStyle = 'rgba(15, 26, 18, 0.85)';
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+          // Title
+          ctx.fillStyle = '#e8eaf6';
+          ctx.font = 'bold 36px ui-monospace, Menlo, Consolas, monospace';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText('Select Save Slot', canvas.width / 2, 60);
+
+          // Draw 3 save slots
+          const slotWidth = 500;
+          const slotHeight = 100;
+          const slotSpacing = 20;
+          const startY = 120;
+          const centerX = canvas.width / 2;
+
+          for (let i = 0; i < SAVE_SLOTS; i++) {
+            const slotY = startY + i * (slotHeight + slotSpacing);
+            const slotInfo = getSaveSlotInfo(i);
+
+            // Check if mouse is hovering over this slot
+            const isHoveringSlot =
+              mouseX >= centerX - slotWidth / 2 &&
+              mouseX <= centerX + slotWidth / 2 &&
+              mouseY >= slotY &&
+              mouseY <= slotY + slotHeight;
+
+            // Slot background
+            ctx.fillStyle = slotInfo
+              ? isHoveringSlot
+                ? 'rgba(50, 60, 120, 0.9)'
+                : 'rgba(40, 50, 100, 0.8)'
+              : 'rgba(30, 30, 50, 0.6)';
+            ctx.fillRect(
+              centerX - slotWidth / 2,
+              slotY,
+              slotWidth,
+              slotHeight
+            );
+
+            // Slot border
+            ctx.strokeStyle = '#e8eaf6';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(
+              centerX - slotWidth / 2,
+              slotY,
+              slotWidth,
+              slotHeight
+            );
+
+            // Slot text
+            ctx.fillStyle = '#e8eaf6';
+            ctx.font = 'bold 20px ui-monospace, Menlo, Consolas, monospace';
+            ctx.textAlign = 'left';
+            ctx.textBaseline = 'top';
+
+            if (slotInfo) {
+              // Save exists - show info
+              const dayName =
+                dayTime.days[slotInfo.dayTime.currentDay] || 'Monday';
+              const hour = slotInfo.dayTime.currentHour || 8;
+              const status = slotInfo.completed ? 'Completed' : 'In Progress';
+
+              ctx.fillText(
+                `Save Slot ${i + 1}`,
+                centerX - slotWidth / 2 + 15,
+                slotY + 15
+              );
+
+              ctx.font = '16px ui-monospace, Menlo, Consolas, monospace';
+              ctx.fillText(
+                `${dayName}, ${hour}:00 - ${status}`,
+                centerX - slotWidth / 2 + 15,
+                slotY + 45
+              );
+            } else {
+              // Empty slot
+              ctx.fillText(
+                `Save Slot ${i + 1} (Empty)`,
+                centerX - slotWidth / 2 + 15,
+                slotY + 35
+              );
+            }
+
+            // Delete button (only if save exists)
+            if (slotInfo) {
+              const deleteButtonSize = 30;
+              const deleteButtonX =
+                centerX + slotWidth / 2 - deleteButtonSize - 10;
+              const deleteButtonY = slotY + 10;
+
+              // Check if hovering over delete button
+              const isHoveringDelete =
+                mouseX >= deleteButtonX &&
+                mouseX <= deleteButtonX + deleteButtonSize &&
+                mouseY >= deleteButtonY &&
+                mouseY <= deleteButtonY + deleteButtonSize;
+
+              // Delete button background
+              ctx.fillStyle = isHoveringDelete
+                ? 'rgba(200, 50, 50, 0.9)'
+                : 'rgba(150, 30, 30, 0.8)';
+              ctx.fillRect(
+                deleteButtonX,
+                deleteButtonY,
+                deleteButtonSize,
+                deleteButtonSize
+              );
+
+              // Delete button border
+              ctx.strokeStyle = '#ff6666';
+              ctx.lineWidth = 1;
+              ctx.strokeRect(
+                deleteButtonX,
+                deleteButtonY,
+                deleteButtonSize,
+                deleteButtonSize
+              );
+
+              // Delete button text
+              ctx.fillStyle = '#ffffff';
+              ctx.font = 'bold 16px ui-monospace, Menlo, Consolas, monospace';
+              ctx.textAlign = 'center';
+              ctx.textBaseline = 'middle';
+              ctx.fillText(
+                'X',
+                deleteButtonX + deleteButtonSize / 2,
+                deleteButtonY + deleteButtonSize / 2
+              );
+            }
+          }
+
+          // Back button
+          const backButtonY =
+            startY + SAVE_SLOTS * (slotHeight + slotSpacing) + 30;
+          const backButtonWidth = 150;
+          const backButtonHeight = 40;
+
+          const isHoveringBack =
+            mouseX >= centerX - backButtonWidth / 2 &&
+            mouseX <= centerX + backButtonWidth / 2 &&
+            mouseY >= backButtonY &&
+            mouseY <= backButtonY + backButtonHeight;
+
+          ctx.fillStyle = isHoveringBack
+            ? 'rgba(80, 80, 100, 0.9)'
+            : 'rgba(60, 60, 80, 0.8)';
+          ctx.fillRect(
+            centerX - backButtonWidth / 2,
+            backButtonY,
+            backButtonWidth,
+            backButtonHeight
+          );
+
+          ctx.strokeStyle = '#e8eaf6';
+          ctx.lineWidth = 2;
+          ctx.strokeRect(
+            centerX - backButtonWidth / 2,
+            backButtonY,
+            backButtonWidth,
+            backButtonHeight
+          );
+
+          ctx.fillStyle = '#e8eaf6';
+          ctx.font = '18px ui-monospace, Menlo, Consolas, monospace';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText('Back', centerX, backButtonY + backButtonHeight / 2);
         }
 
         // Starting screen rendering (shown while heavy setup runs)
@@ -8259,9 +9861,9 @@
 
           const controlsText = [
             'Use the WASD keys or the Arrow keys on your keyboard to move',
-            'Press the space button when close to a person to talk to them',
+            'Press the space bar when close to a person to talk to them. Try to talk to as many as you can!',
             'Hold down the shift key to move faster. Keep an eye on your stamina on the top left!',
-            'Press E to open your inventory to check your artifacts',
+            'Press E to open your inventory to check your artifacts. Click on an artifact, then the delete button to delete it.',
           ];
 
           let textY = canvas.height / 2 - 40;
@@ -8280,15 +9882,57 @@
           );
         }
 
-        // Handle mouse clicks for title screen
+        // Handle mouse clicks for title screen and achievements screen
         canvas.addEventListener('click', (e) => {
-          if (gameState === 'title') {
+          if (gameState === 'achievements') {
+            const rect = canvas.getBoundingClientRect();
+            const scaleX = canvas.width / rect.width;
+            const scaleY = canvas.height / rect.height;
+            const x = (e.clientX - rect.left) * scaleX;
+            const y = (e.clientY - rect.top) * scaleY;
+
+            // Back button (top left)
+            const backButtonX = 50;
+            const backButtonY = 30;
+            const backButtonWidth = 120;
+            const backButtonHeight = 40;
+
+            if (
+              x >= backButtonX - backButtonWidth / 2 &&
+              x <= backButtonX + backButtonWidth / 2 &&
+              y >= backButtonY - backButtonHeight / 2 &&
+              y <= backButtonY + backButtonHeight / 2
+            ) {
+              // Go back to title screen
+              gameState = 'title';
+              e.stopPropagation();
+              return;
+            }
+          } else if (gameState === 'title') {
             const rect = canvas.getBoundingClientRect();
             // Account for canvas scaling - convert display coordinates to internal canvas coordinates
             const scaleX = canvas.width / rect.width;
             const scaleY = canvas.height / rect.height;
             const x = (e.clientX - rect.left) * scaleX;
             const y = (e.clientY - rect.top) * scaleY;
+
+            // Check if click is on achievements button
+            const achievementsButtonX = canvas.width / 2;
+            const achievementsButtonY = canvas.height / 2 + 120;
+            const achievementsButtonWidth = 200;
+            const achievementsButtonHeight = 60;
+
+            if (
+              x >= achievementsButtonX - achievementsButtonWidth / 2 &&
+              x <= achievementsButtonX + achievementsButtonWidth / 2 &&
+              y >= achievementsButtonY - achievementsButtonHeight / 2 &&
+              y <= achievementsButtonY + achievementsButtonHeight / 2
+            ) {
+              // Go to achievements screen
+              gameState = 'achievements';
+              e.stopPropagation();
+              return;
+            }
 
             // Check if click is on play button
             const buttonX = canvas.width / 2;
@@ -8302,9 +9946,85 @@
               y >= buttonY - buttonHeight / 2 &&
               y <= buttonY + buttonHeight / 2
             ) {
-              // Go to controls screen first
-              gameState = 'controls';
+              // Go to save selection screen
+              gameState = 'saveSelect';
               e.stopPropagation(); // Prevent other handlers from processing
+            }
+          } else if (gameState === 'saveSelect') {
+            // Handle clicks on save selection screen
+            const rect = canvas.getBoundingClientRect();
+            const scaleX = canvas.width / rect.width;
+            const scaleY = canvas.height / rect.height;
+            const x = (e.clientX - rect.left) * scaleX;
+            const y = (e.clientY - rect.top) * scaleY;
+
+            const slotWidth = 500;
+            const slotHeight = 100;
+            const slotSpacing = 20;
+            const startY = 120;
+            const centerX = canvas.width / 2;
+
+            // Check save slot clicks
+            for (let i = 0; i < SAVE_SLOTS; i++) {
+              const slotY = startY + i * (slotHeight + slotSpacing);
+              const slotInfo = getSaveSlotInfo(i);
+
+              // Check if clicking on the slot (but not delete button)
+              const deleteButtonSize = 30;
+              const deleteButtonX = centerX + slotWidth / 2 - deleteButtonSize - 10;
+              const deleteButtonY = slotY + 10;
+
+              // Check delete button first (if save exists)
+              if (
+                slotInfo &&
+                x >= deleteButtonX &&
+                x <= deleteButtonX + deleteButtonSize &&
+                y >= deleteButtonY &&
+                y <= deleteButtonY + deleteButtonSize
+              ) {
+                // Delete this save slot
+                if (confirm(`Delete Save Slot ${i + 1}?`)) {
+                  deleteSaveSlot(i);
+                }
+                return;
+              }
+
+              // Check if clicking on the slot itself
+              if (
+                x >= centerX - slotWidth / 2 &&
+                x <= centerX + slotWidth / 2 &&
+                y >= slotY &&
+                y <= slotY + slotHeight
+              ) {
+                // Load or start new game in this slot
+                if (slotInfo) {
+                  // Load existing save
+                  if (loadGame(i)) {
+                    // Successfully loaded - go to playing state
+                    gameState = 'playing';
+                  }
+                } else {
+                  // Start new game in this slot
+                  currentSaveSlot = i;
+                  gameState = 'controls';
+                }
+                return;
+              }
+            }
+
+            // Check back button
+            const backButtonY = startY + SAVE_SLOTS * (slotHeight + slotSpacing) + 30;
+            const backButtonWidth = 150;
+            const backButtonHeight = 40;
+
+            if (
+              x >= centerX - backButtonWidth / 2 &&
+              x <= centerX + backButtonWidth / 2 &&
+              y >= backButtonY &&
+              y <= backButtonY + backButtonHeight
+            ) {
+              // Go back to title screen
+              gameState = 'title';
             }
           }
         });
@@ -8330,6 +10050,9 @@
                 loadingState.displayProgress >= 0.99 &&
                 loadingState.allLoaded
               ) {
+                // Load achievements from localStorage (global, not per-save)
+                loadAchievements();
+                
                 // Ensure tiles are regenerated with sprites before starting
                 tileRegenerationScheduled = false;
                 doRegenerateTiles(); // Regenerate all tiles with loaded sprites
@@ -8343,6 +10066,21 @@
                 titleScreenCamera.angle -= Math.PI * 2;
               }
               drawTitleScreen();
+            } else if (gameState === 'achievements') {
+              // Update achievements screen camera for smooth circular scrolling
+              titleScreenCamera.angle += titleScreenCamera.speed * dtSeconds;
+              // Keep angle in reasonable range to prevent overflow
+              if (titleScreenCamera.angle > Math.PI * 2) {
+                titleScreenCamera.angle -= Math.PI * 2;
+              }
+              drawAchievementsScreen();
+            } else if (gameState === 'saveSelect') {
+              // Update title screen camera for save selection screen too
+              titleScreenCamera.angle += titleScreenCamera.speed * dtSeconds;
+              if (titleScreenCamera.angle > Math.PI * 2) {
+                titleScreenCamera.angle -= Math.PI * 2;
+              }
+              drawSaveSelectScreen();
             } else if (gameState === 'controls') {
               // Draw controls screen
               drawControlsScreen();
