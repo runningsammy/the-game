@@ -29,9 +29,18 @@
   "files.autoSave": "afterDelay",
   "files.autoSaveDelay": 1000,
 
-  // Terminal settings - use Git Bash as default on Windows
-  "terminal.integrated.defaultProfile.windows": "Git Bash",
+  // Terminal: Command Prompt so run commands (e.g. node server.js) work even when Git Bash isn't available
+  "terminal.integrated.defaultProfile.windows": "Command Prompt",
+  "terminal.integrated.automationProfile.windows": {
+    "path": "C:\\Windows\\System32\\cmd.exe",
+    "args": []
+  },
   "terminal.integrated.profiles.windows": {
+    "Command Prompt": {
+      "path": "C:\\Windows\\System32\\cmd.exe",
+      "args": [],
+      "icon": "terminal-cmd"
+    },
     "Git Bash": {
       "path": "C:\\Program Files\\Git\\bin\\bash.exe",
       "args": ["--login"],

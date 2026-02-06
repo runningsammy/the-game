@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
   <head>
     <meta charset="utf-8" />
@@ -11,8 +11,17 @@
         margin: 0;
         background: #0f1a12;
         color: #e8eaf6;
-        font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu,
-          Cantarell, Noto Sans, Helvetica, Arial, 'Apple Color Emoji',
+        font-family:
+          system-ui,
+          -apple-system,
+          Segoe UI,
+          Roboto,
+          Ubuntu,
+          Cantarell,
+          Noto Sans,
+          Helvetica,
+          Arial,
+          'Apple Color Emoji',
           'Segoe UI Emoji';
       }
       .wrap {
@@ -29,7 +38,8 @@
       canvas {
         background: #1c7f2d;
         border: 1px solid #2b2f55;
-        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35),
+        box-shadow:
+          0 10px 30px rgba(0, 0, 0, 0.35),
           inset 0 0 0 1px rgba(255, 255, 255, 0.03);
         image-rendering: -moz-crisp-edges;
         image-rendering: -webkit-optimize-contrast;
@@ -49,8 +59,9 @@
         border-bottom-width: 2px;
         border-radius: 4px;
         padding: 1px 6px;
-        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas,
-          'Liberation Mono', monospace;
+        font-family:
+          ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono',
+          monospace;
         font-size: 12px;
       }
     </style>
@@ -113,33 +124,95 @@
           // List of achievements - each has: id, name, description, completed (boolean)
           // Names are always visible, descriptions show "???" when locked
           list: [
-            { id: 'clocking_out', name: 'Clocking out', description: 'Complete a full week of work', completed: false },
-            { id: 'scanning_master', name: 'Scanning master', description: 'You got the radar', iconType: 'radar', completed: false },
-            { id: 'henry_knox_experience', name: 'Henry Knox Experience', description: 'You displayed the cannon', iconType: 'cannon', completed: false },
-            { id: 'nothing', name: 'Nothing', description: "You didn't do anything. Wow.", completed: false },
-            { id: 'consolation_prize', name: 'Consolation prize', description: "You didn't do that bad, I guess.", completed: false },
-            { id: 'classic', name: 'Classic', description: 'Congrats on a amazing museum!', completed: false },
-            { id: 'overachiever', name: 'Overachiever', description: 'You did great! There may be something you are missing, though.', completed: false },
-            { id: 'locked1', name: 'Achievement 2', description: '???', completed: false },
-            { id: 'locked2', name: 'Achievement 3', description: '???', completed: false },
-            { id: 'locked3', name: 'Achievement 4', description: '???', completed: false },
-            { id: 'locked4', name: 'Achievement 5', description: '???', completed: false },
-            { id: 'locked5', name: 'Achievement 6', description: '???', completed: false },
-            { id: 'locked6', name: 'Achievement 7', description: '???', completed: false },
-            { id: 'locked7', name: 'Achievement 8', description: '???', completed: false },
-            { id: 'locked8', name: 'Achievement 9', description: '???', completed: false },
-            { id: 'locked9', name: 'Achievement 10', description: '???', completed: false },
+            {
+              id: 'clocking_out',
+              name: 'Clocking out',
+              description: 'Complete a full week of work',
+              completed: false,
+            },
+            {
+              id: 'scanning_master',
+              name: 'Scanning master',
+              description: 'You got the radar',
+              iconType: 'radar',
+              completed: false,
+            },
+            {
+              id: 'henry_knox_experience',
+              name: 'Henry Knox Experience',
+              description: 'You displayed the cannon',
+              iconType: 'cannon',
+              completed: false,
+            },
+            {
+              id: 'nothing',
+              name: 'Nothing',
+              description: "You didn't do anything. Wow.",
+              completed: false,
+            },
+            {
+              id: 'consolation_prize',
+              name: 'Consolation prize',
+              description: "You didn't do that bad, I guess.",
+              completed: false,
+            },
+            {
+              id: 'classic',
+              name: 'Classic',
+              description: 'Congrats on a amazing museum!',
+              completed: false,
+            },
+            {
+              id: 'overachiever',
+              name: 'Overachiever',
+              description:
+                'You did great! There may be something you are missing, though.',
+              completed: false,
+            },
+            {
+              id: 'legendary',
+              name: 'Legendary',
+              description: 'You got the best ending! Hooray to you!',
+              completed: false,
+            },
+            {
+              id: 'good_start',
+              name: 'Good start',
+              description: 'You dug your first X!',
+              completed: false,
+            },
+            {
+              id: 'on_the_right_track',
+              name: 'On the right track',
+              description: "You dug 20 X's!",
+              completed: false,
+            },
+            {
+              id: 'pro_digger',
+              name: 'Pro digger',
+              description: "You dug 50 X's!",
+              completed: false,
+            },
+            {
+              id: 'master_digger',
+              name: 'Master digger',
+              description: "You dug a whopping 100 X's!",
+              completed: false,
+            },
           ],
         };
 
         // Save achievements to localStorage (global, not per-save)
         function saveAchievements() {
           try {
-            const achievementsData = achievements.list.map(a => ({
+            const achievementsData = achievements.list.map((a) => ({
               id: a.id,
               completed: a.completed,
             }));
-            localStorage.setItem('gameAchievements', JSON.stringify(achievementsData));
+            localStorage.setItem(
+              'gameAchievements',
+              JSON.stringify(achievementsData),
+            );
           } catch (error) {
             console.error('Failed to save achievements:', error);
           }
@@ -148,12 +221,15 @@
         // Load achievements from localStorage
         function loadAchievements() {
           try {
-            const achievementsDataStr = localStorage.getItem('gameAchievements');
+            const achievementsDataStr =
+              localStorage.getItem('gameAchievements');
             if (achievementsDataStr) {
               const achievementsData = JSON.parse(achievementsDataStr);
               // Merge saved completion status with current achievement list
-              achievements.list.forEach(achievement => {
-                const saved = achievementsData.find(a => a.id === achievement.id);
+              achievements.list.forEach((achievement) => {
+                const saved = achievementsData.find(
+                  (a) => a.id === achievement.id,
+                );
                 if (saved) {
                   achievement.completed = saved.completed;
                 }
@@ -230,7 +306,7 @@
               // Radar discoveries
               radar: {
                 discoveredSecretX: JSON.parse(
-                  JSON.stringify(radar.discoveredSecretX)
+                  JSON.stringify(radar.discoveredSecretX),
                 ),
                 rings: JSON.parse(JSON.stringify(radar.rings)),
               },
@@ -321,11 +397,14 @@
 
             // Restore inventory
             if (saveData.inventory) {
-              inventory.slots = saveData.inventory.slots || Array(25).fill(null);
+              inventory.slots =
+                saveData.inventory.slots || Array(25).fill(null);
               // Restore artifact sprites (they don't serialize properly)
               for (let i = 0; i < inventory.slots.length; i++) {
                 if (inventory.slots[i] && inventory.slots[i].name) {
-                  const sprite = getArtifactSpriteByName(inventory.slots[i].name);
+                  const sprite = getArtifactSpriteByName(
+                    inventory.slots[i].name,
+                  );
                   if (sprite) {
                     inventory.slots[i].sprite = sprite;
                   }
@@ -333,7 +412,9 @@
               }
               // Restore equipment sprite if it's an artifact
               if (inventory.equipment && inventory.equipment.name) {
-                const equipmentSprite = getArtifactSpriteByName(inventory.equipment.name);
+                const equipmentSprite = getArtifactSpriteByName(
+                  inventory.equipment.name,
+                );
                 if (equipmentSprite) {
                   inventory.equipment.sprite = equipmentSprite;
                 }
@@ -346,16 +427,27 @@
               museum.displayCases = saveData.museum.displayCases || [];
               // Restore artifact sprites in display cases
               for (let i = 0; i < museum.displayCases.length; i++) {
-                if (museum.displayCases[i].artifact && museum.displayCases[i].artifact.name) {
-                  const sprite = getArtifactSpriteByName(museum.displayCases[i].artifact.name);
+                if (
+                  museum.displayCases[i].artifact &&
+                  museum.displayCases[i].artifact.name
+                ) {
+                  const sprite = getArtifactSpriteByName(
+                    museum.displayCases[i].artifact.name,
+                  );
                   if (sprite) {
                     museum.displayCases[i].artifact.sprite = sprite;
                   }
                 }
               }
               // Restore cannon display sprite
-              if (museum.cannonDisplay && museum.cannonDisplay.artifact && museum.cannonDisplay.artifact.name) {
-                const sprite = getArtifactSpriteByName(museum.cannonDisplay.artifact.name);
+              if (
+                museum.cannonDisplay &&
+                museum.cannonDisplay.artifact &&
+                museum.cannonDisplay.artifact.name
+              ) {
+                const sprite = getArtifactSpriteByName(
+                  museum.cannonDisplay.artifact.name,
+                );
                 if (sprite) {
                   museum.cannonDisplay.artifact.sprite = sprite;
                 }
@@ -377,7 +469,8 @@
                   saveData.npcs.oldGuy.hasCompletedIntro || false;
               }
               if (saveData.npcs.joseph) {
-                joseph.hasGivenRadar = saveData.npcs.joseph.hasGivenRadar || false;
+                joseph.hasGivenRadar =
+                  saveData.npcs.joseph.hasGivenRadar || false;
               }
               if (saveData.npcs.warningGuy) {
                 warningGuy.hasCompletedIntro =
@@ -515,7 +608,7 @@
           loadingState.loadingTimer += dtMs;
           const timeBasedProgress = Math.min(
             loadingState.loadingTimer / loadingState.fillDuration,
-            1.0
+            1.0,
           );
 
           // Smooth the progress bar animation using linear interpolation (lerp)
@@ -554,7 +647,7 @@
             ctx.fillText(
               'Loading...',
               canvas.width / 2,
-              canvas.height / 2 - 60
+              canvas.height / 2 - 60,
             );
 
             // Progress bar background
@@ -583,7 +676,7 @@
             // Clamp percent to 0-100 so it never shows negative values
             const percentValue = Math.min(
               Math.max(loadingState.displayProgress || 0, 0),
-              1
+              1,
             );
             const percentText = Math.round(percentValue * 100) + '%';
             ctx.fillText(percentText, canvas.width / 2, barY + barHeight + 30);
@@ -703,7 +796,7 @@
           minSize,
           maxSize,
           margin = 60,
-          minDistance = 120
+          minDistance = 120,
         ) {
           const sprites = [];
           const maxAttempts = 50;
@@ -713,7 +806,7 @@
           const grid = Array.from({ length: gridRows }, () =>
             Array(gridCols)
               .fill(null)
-              .map(() => [])
+              .map(() => []),
           );
 
           function getGridCell(x, y) {
@@ -902,11 +995,13 @@
             correctAnswer: true, // Yes
           },
           {
-            question: 'You should always get permission to dig on land you do not own.',
+            question:
+              'You should always get permission to dig on land you do not own.',
             correctAnswer: true, // Yes
           },
           {
-            question: 'If you find a grave while digging, you should open it without consulting the property owners.',
+            question:
+              'If you find a grave while digging, you should open it without consulting the property owners.',
             correctAnswer: false, // No
           },
           {
@@ -1357,7 +1452,7 @@
                     -tileSize / 2,
                     -tileSize / 2,
                     tileSize,
-                    tileSize
+                    tileSize,
                   );
                   ctx.restore();
                 } else {
@@ -1473,7 +1568,7 @@
 
         const tileWeightTotal = tileDefinitions.reduce(
           (sum, t) => sum + t.weight,
-          0
+          0,
         );
 
         function pickTileDefinition() {
@@ -1605,7 +1700,7 @@
             barX,
             0,
             barX + barW,
-            0
+            0,
           );
           normalGradient.addColorStop(0, '#51ff8a'); // Original teal/green
           normalGradient.addColorStop(1, '#7cffb3'); // Original teal/green
@@ -1613,7 +1708,7 @@
             barX,
             0,
             barX + barW,
-            0
+            0,
           );
           exhaustedGradient.addColorStop(0, '#ff4d4f');
           exhaustedGradient.addColorStop(1, '#ff7875');
@@ -1867,7 +1962,7 @@
 
                   if (distSq <= interactionDistSq) {
                     const hasArtifacts = inventory.slots.some(
-                      (slot) => slot !== null
+                      (slot) => slot !== null,
                     );
 
                     if (hasArtifacts) {
@@ -1998,9 +2093,8 @@
               startGamePending = true;
               return;
             }
-
           },
-          { passive: false }
+          { passive: false },
         );
 
         window.addEventListener('keyup', (e) => {
@@ -2287,10 +2381,10 @@
                 y <= slotsStartY + slotsHeight
               ) {
                 const col = Math.floor(
-                  (x - slotsStartX) / (slotSize + slotSpacing)
+                  (x - slotsStartX) / (slotSize + slotSpacing),
                 );
                 const row = Math.floor(
-                  (y - slotsStartY) / (slotSize + slotSpacing)
+                  (y - slotsStartY) / (slotSize + slotSpacing),
                 );
                 const index = row * slotsPerRow + col;
                 const artifacts = buildLayout.artifacts;
@@ -2347,7 +2441,7 @@
                   // Try to remove cannon artifact back into inventory
                   const added = addItemToInventory(
                     museum.cannonDisplay.artifact.name,
-                    museum.cannonDisplay.artifact.sprite
+                    museum.cannonDisplay.artifact.sprite,
                   );
                   if (added) {
                     museum.cannonDisplay.artifact = null;
@@ -2384,7 +2478,7 @@
                       // Try to remove artifact back into inventory
                       const added = addItemToInventory(
                         displayCase.artifact.name,
-                        displayCase.artifact.sprite
+                        displayCase.artifact.sprite,
                       );
                       if (added) {
                         displayCase.artifact = null;
@@ -2723,7 +2817,8 @@
 
             // Check if clicking on red X delete button
             const deleteButtonSize = 40;
-            const deleteButtonX = buildLayout.panelX + buildLayout.panelWidth + 60; // 60px spacing from inventory (moved right)
+            const deleteButtonX =
+              buildLayout.panelX + buildLayout.panelWidth + 60; // 60px spacing from inventory (moved right)
             const deleteButtonY = buildLayout.panelY + buildLayout.titleHeight;
 
             if (
@@ -3091,12 +3186,12 @@
             player.x = clamp(
               player.x,
               wallThickness + playerRadius,
-              museumWorldWidth - wallThickness - playerRadius
+              museumWorldWidth - wallThickness - playerRadius,
             );
             player.y = clamp(
               player.y,
               wallThickness + playerRadius,
-              museumWorldHeight - wallThickness - playerRadius
+              museumWorldHeight - wallThickness - playerRadius,
             );
 
             // Update camera - follow player horizontally, but keep museum at bottom
@@ -3106,7 +3201,7 @@
               camera.x = clamp(
                 camera.x,
                 canvas.width / 2,
-                museumWorldWidth - canvas.width / 2
+                museumWorldWidth - canvas.width / 2,
               );
             } else {
               // Museum is smaller than canvas - keep camera centered horizontally
@@ -3119,7 +3214,7 @@
               camera.y = clamp(
                 camera.y,
                 canvas.height / 2,
-                museumWorldHeight - canvas.height / 2
+                museumWorldHeight - canvas.height / 2,
               );
             } else {
               // Museum is smaller than canvas - position at bottom middle
@@ -3139,7 +3234,8 @@
 
             // Smaller activation radius (0.8 tiles) - squared
             const doorActivationRadius = museumTileSize * 0.8;
-            const doorActivationRadiusSq = doorActivationRadius * doorActivationRadius;
+            const doorActivationRadiusSq =
+              doorActivationRadius * doorActivationRadius;
             const wasNearDoor = museum.wasNearDoor || false;
 
             if (distToDoorSq < doorActivationRadiusSq) {
@@ -3300,7 +3396,7 @@
 
           // Clear keyJustPressed at end of frame
           Object.keys(keyJustPressed).forEach(
-            (key) => (keyJustPressed[key] = false)
+            (key) => (keyJustPressed[key] = false),
           );
 
           // Camera follow (smoothly move camera toward player)
@@ -3354,7 +3450,7 @@
               const maxParticles = 50; // Limit total particles for performance
               const particlesToEmit = Math.min(
                 particleEmitRate * dt,
-                maxParticles - crouchAnimation.particles.length
+                maxParticles - crouchAnimation.particles.length,
               );
               // Optimize: cache screen position calculation
               const screenX = player.x - camera.x + canvas.width / 2;
@@ -3420,12 +3516,12 @@
           const startRow = Math.max(0, Math.floor(viewTop / tileSize) - 1);
           const endRow = Math.min(
             tileRows - 1,
-            Math.ceil(viewBottom / tileSize) + 1
+            Math.ceil(viewBottom / tileSize) + 1,
           );
           const startCol = Math.max(0, Math.floor(viewLeft / tileSize) - 1);
           const endCol = Math.min(
             tileCols - 1,
-            Math.ceil(viewRight / tileSize) + 1
+            Math.ceil(viewRight / tileSize) + 1,
           );
 
           for (let row = startRow; row <= endRow; row++) {
@@ -3625,7 +3721,7 @@
                   leftDist,
                   rightDist,
                   topDist,
-                  bottomDist
+                  bottomDist,
                 );
 
                 if (minDist === leftDist) {
@@ -3676,7 +3772,7 @@
                 slot.name !== 'Cannon' &&
                 (slot.tier === 'rare' ||
                   slot.tier === 'super rare' ||
-                  slot.tier === 'legendary')
+                  slot.tier === 'legendary'),
             );
 
             if (rareArtifacts.length > 0) {
@@ -3907,7 +4003,7 @@
             if (distSq <= minDistSq * 1.2) {
               // Check if player has any artifacts
               const hasArtifacts = inventory.slots.some(
-                (slot) => slot !== null
+                (slot) => slot !== null,
               );
 
               if (curator.hasCompletedIntro) {
@@ -3976,9 +4072,87 @@
               // Kill momentum when opening dialogue
               player.vx = 0;
               player.vy = 0;
+            return;
+          }
+          return;
+        }
+
+          // In playing state, check for X tile first (priority over NPC dialogue)
+          if (gameState === 'playing') {
+            const playerLeft = player.x - player.radius;
+            const playerRight = player.x + player.radius;
+            const playerTop = player.y - player.radius;
+            const playerBottom = player.y + player.radius;
+            const startCol = Math.floor(playerLeft / tileSize);
+            const endCol = Math.floor(playerRight / tileSize);
+            const startRow = Math.floor(playerTop / tileSize);
+            const endRow = Math.floor(playerBottom / tileSize);
+            let foundXTile = null;
+            let foundRow = null;
+            let foundCol = null;
+            for (let row = startRow; row <= endRow; row++) {
+              if (row < 0 || row >= tileRows) continue;
+              for (let col = startCol; col <= endCol; col++) {
+                if (col < 0 || col >= tileCols) continue;
+                const tile = tileMap[row][col];
+                if (tile && (tile.name === 'redX' || tile.name === 'secretX')) {
+                  const tileLeft = col * tileSize;
+                  const tileRight = (col + 1) * tileSize;
+                  const tileTop = row * tileSize;
+                  const tileBottom = (row + 1) * tileSize;
+                  if (
+                    playerRight > tileLeft &&
+                    playerLeft < tileRight &&
+                    playerBottom > tileTop &&
+                    playerTop < tileBottom
+                  ) {
+                    foundXTile = tile;
+                    foundRow = row;
+                    foundCol = col;
+                    break;
+                  }
+                }
+              }
+              if (foundXTile) break;
+            }
+            if (foundXTile) {
+              const tile = foundXTile;
+              const row = foundRow;
+              const col = foundCol;
+              if (!crouchAnimation.active) {
+                crouchAnimation.active = true;
+                crouchAnimation.timer = 0;
+                crouchAnimation.particles = [];
+                if (tile.name === 'redX' || tile.name === 'secretX') {
+                  crouchAnimation.pendingMinigame = 'quiz';
+                  crouchAnimation.isSecretX = tile.name === 'secretX';
+                  crouchAnimation.tileRow = row;
+                  crouchAnimation.tileCol = col;
+                  const grassDef = tileDefinitions.find(
+                    (def) => def.name === 'grass',
+                  );
+                  if (grassDef) {
+                    tileMap[row][col] = {
+                      name: grassDef.name,
+                      canvas: createTileCanvas(grassDef.draw),
+                    };
+                    if (tile.name === 'secretX') {
+                      radar.discoveredSecretX = radar.discoveredSecretX.filter(
+                        (pos) => !(pos.row === row && pos.col === col),
+                      );
+                    }
+                  }
+                } else {
+                  crouchAnimation.pendingMinigame = null;
+                  crouchAnimation.isSecretX = false;
+                  crouchAnimation.tileRow = null;
+                  crouchAnimation.tileCol = null;
+                }
+                player.vx = 0;
+                player.vy = 0;
+              }
               return;
             }
-            return;
           }
 
           // Check if player is touching old guy (collision-based)
@@ -4057,133 +4231,6 @@
             player.vy = 0;
             return;
           }
-
-          // Check if player is on a tile (any tile triggers crouch animation)
-          // Only allow digging in 'playing' state (not in museum or other states)
-          if (gameState !== 'playing') {
-            // Still allow Space for dialogue/interactions in other states
-            return;
-          }
-
-          // Check if player's bounding box overlaps with any red X or secret X tile
-          // This makes the hitbox cover the entire tile, not just the player's center point
-          const playerLeft = player.x - player.radius;
-          const playerRight = player.x + player.radius;
-          const playerTop = player.y - player.radius;
-          const playerBottom = player.y + player.radius;
-
-          // Check all tiles that the player's bounding box overlaps with
-          const startCol = Math.floor(playerLeft / tileSize);
-          const endCol = Math.floor(playerRight / tileSize);
-          const startRow = Math.floor(playerTop / tileSize);
-          const endRow = Math.floor(playerBottom / tileSize);
-
-          let foundXTile = null;
-          let foundRow = null;
-          let foundCol = null;
-
-          // Check each overlapping tile for red X or secret X
-          for (let row = startRow; row <= endRow; row++) {
-            if (row < 0 || row >= tileRows) continue;
-            for (let col = startCol; col <= endCol; col++) {
-              if (col < 0 || col >= tileCols) continue;
-              const tile = tileMap[row][col];
-              if (tile && (tile.name === 'redX' || tile.name === 'secretX')) {
-                // Check if player's bounding box actually overlaps with this tile's bounding box
-                const tileLeft = col * tileSize;
-                const tileRight = (col + 1) * tileSize;
-                const tileTop = row * tileSize;
-                const tileBottom = (row + 1) * tileSize;
-
-                // AABB (Axis-Aligned Bounding Box) collision check
-                // Check if rectangles overlap
-                if (
-                  playerRight > tileLeft &&
-                  playerLeft < tileRight &&
-                  playerBottom > tileTop &&
-                  playerTop < tileBottom
-                ) {
-                  foundXTile = tile;
-                  foundRow = row;
-                  foundCol = col;
-                  break; // Found an X tile, stop searching
-                }
-              }
-            }
-            if (foundXTile) break; // Found an X tile, stop searching
-          }
-
-          // If we found an X tile, interact with it
-          if (foundXTile) {
-            const tile = foundXTile;
-            const row = foundRow;
-            const col = foundCol;
-
-            if (tile) {
-              // Start crouch animation on any tile (prevents spamming)
-              if (!crouchAnimation.active) {
-                crouchAnimation.active = true;
-                crouchAnimation.timer = 0;
-                crouchAnimation.particles = []; // Initialize particles array
-                // Only store minigame if on red X or secret X tile, otherwise just play animation
-                if (tile.name === 'redX' || tile.name === 'secretX') {
-                  // Store which minigame to start after animation
-                  // Weighted random selection: brushing 28.3%, minesweeper 35.85%, typo 35.85%
-                  // TESTING: Quiz minigame 100% chance
-                  crouchAnimation.pendingMinigame = 'quiz';
-
-                  // Original random selection (commented out for testing):
-                  // const roll = Math.random();
-                  // if (roll < 0.283) {
-                  //   // 28.3% chance - Brushing (reduced from 33.3%)
-                  //   crouchAnimation.pendingMinigame = 'brushing';
-                  // } else if (roll < 0.5) {
-                  //   // 25% chance - Minesweeper
-                  //   crouchAnimation.pendingMinigame = 'minesweeper';
-                  // } else if (roll < 0.75) {
-                  //   // 25% chance - Typo
-                  //   crouchAnimation.pendingMinigame = 'typo';
-                  // } else {
-                  //   // 25% chance - Quiz
-                  //   crouchAnimation.pendingMinigame = 'quiz';
-                  // }
-                  // Store whether this is a secret X tile for later reward multiplier
-                  crouchAnimation.isSecretX = tile.name === 'secretX';
-
-                  // Store tile position for conversion to grass
-                  crouchAnimation.tileRow = row;
-                  crouchAnimation.tileCol = col;
-
-                  // Convert X tile to grass immediately when interacted with
-                  const grassDef = tileDefinitions.find(
-                    (def) => def.name === 'grass'
-                  );
-                  if (grassDef) {
-                    tileMap[row][col] = {
-                      name: grassDef.name,
-                      canvas: createTileCanvas(grassDef.draw),
-                    };
-                    // Remove from discovered secret X list if it was a secret X tile
-                    if (tile.name === 'secretX') {
-                      radar.discoveredSecretX = radar.discoveredSecretX.filter(
-                        (pos) => !(pos.row === row && pos.col === col)
-                      );
-                    }
-                  }
-                } else {
-                  // No minigame for other tiles
-                  crouchAnimation.pendingMinigame = null;
-                  crouchAnimation.isSecretX = false;
-                  crouchAnimation.tileRow = null;
-                  crouchAnimation.tileCol = null;
-                }
-                // Stop player movement during crouch animation
-                player.vx = 0;
-                player.vy = 0;
-              }
-              return;
-            }
-          }
         }
 
         // Helper function to add items to inventory when minigames complete
@@ -4251,7 +4298,8 @@
         function playerOrMuseumHasCannon() {
           // Check inventory slots
           const hasInInventory = inventory.slots.some(
-            (slot) => slot && slot.type === 'artifact' && slot.name === 'Cannon'
+            (slot) =>
+              slot && slot.type === 'artifact' && slot.name === 'Cannon',
           );
 
           // Check museum cannon display
@@ -4305,6 +4353,27 @@
         // Legendary: Cannon (1.25%, restricted to one per save), Cartridge (1.25%, unlimited) = 2.5% total
         // For secret X: Cannon (1.875%, restricted), Cartridge (1.875%, unlimited) = 3.75% total
         function giveMinigameReward() {
+          // Increment global X dug count (for achievements)
+          let totalXDug = parseInt(localStorage.getItem('gameTotalXDug') || '0', 10);
+          totalXDug += 1;
+          localStorage.setItem('gameTotalXDug', String(totalXDug));
+          // Unlock dig-count achievements
+          const digAchievements = [
+            { id: 'good_start', threshold: 1 },
+            { id: 'on_the_right_track', threshold: 20 },
+            { id: 'pro_digger', threshold: 50 },
+            { id: 'master_digger', threshold: 100 },
+          ];
+          for (const { id, threshold } of digAchievements) {
+            if (totalXDug >= threshold) {
+              const ach = achievements.list.find((a) => a.id === id);
+              if (ach && !ach.completed) {
+                ach.completed = true;
+                saveAchievements();
+              }
+            }
+          }
+
           // Check if this reward is from a radar-discovered secret X
           const isSecretX =
             brushingMinigame.isSecretX ||
@@ -4629,7 +4698,7 @@
                 typoOptions[Math.floor(Math.random() * typoOptions.length)];
               typoMinigame.testExcerpt = typoMinigame.realExcerpt.replace(
                 selectedTypo.from,
-                selectedTypo.to
+                selectedTypo.to,
               );
               // Store the typo info for highlighting when wrong
               typoMinigame.selectedTypo = selectedTypo;
@@ -4652,9 +4721,7 @@
 
             // Randomly select a question
             const selectedQuestion =
-              quizQuestions[
-                Math.floor(Math.random() * quizQuestions.length)
-              ];
+              quizQuestions[Math.floor(Math.random() * quizQuestions.length)];
             quizMinigame.question = selectedQuestion.question;
             quizMinigame.correctAnswer = selectedQuestion.correctAnswer;
           }
@@ -4718,7 +4785,7 @@
             brushingMinigame.dirtLevel -= 0.2 * dt;
             brushingMinigame.dirtLevel = Math.max(
               0,
-              brushingMinigame.dirtLevel
+              brushingMinigame.dirtLevel,
             );
 
             // After at least 5 seconds, dirt is cleaned
@@ -4737,7 +4804,7 @@
                   dt / brushingMinigame.redTransitionTime;
                 brushingMinigame.redness = Math.min(
                   1.0,
-                  brushingMinigame.redness
+                  brushingMinigame.redness,
                 );
               }
 
@@ -4794,7 +4861,7 @@
               brushingMinigame.dirtLevel += 0.15 * dt;
               brushingMinigame.dirtLevel = Math.min(
                 1.0,
-                brushingMinigame.dirtLevel
+                brushingMinigame.dirtLevel,
               );
             }
           }
@@ -5303,7 +5370,7 @@
 
                   // Mark this secret X as discovered (avoid duplicates)
                   const alreadyDiscovered = radar.discoveredSecretX.some(
-                    (pos) => pos.row === ringRow && pos.col === ringCol
+                    (pos) => pos.row === ringRow && pos.col === ringCol,
                   );
                   if (!alreadyDiscovered) {
                     radar.discoveredSecretX.push({
@@ -5516,7 +5583,7 @@
               tree.size * 0.2,
               0,
               0,
-              Math.PI * 2
+              Math.PI * 2,
             );
             ctx.fill();
 
@@ -5528,7 +5595,7 @@
               ctx.drawImage(
                 treeSprite,
                 -treeSprite.width / 2,
-                -treeSprite.height / 2
+                -treeSprite.height / 2,
               );
             }
             ctx.restore();
@@ -5560,7 +5627,7 @@
               scaledHeight * 0.22,
               0,
               0,
-              Math.PI * 2
+              Math.PI * 2,
             );
             ctx.fill();
 
@@ -5587,7 +5654,7 @@
                 radarSpriteSize * 0.22,
                 0,
                 0,
-                Math.PI * 2
+                Math.PI * 2,
               );
               ctx.fill();
 
@@ -5597,7 +5664,7 @@
                 radarX - radarSpriteSize / 2,
                 radarY,
                 radarSpriteSize,
-                radarSpriteSize
+                radarSpriteSize,
               );
             }
           } else {
@@ -5611,7 +5678,7 @@
               joseph.radius * 0.2,
               0,
               0,
-              Math.PI * 2
+              Math.PI * 2,
             );
             ctx.fill();
 
@@ -5643,7 +5710,7 @@
               spriteHeight * 0.22,
               0,
               0,
-              Math.PI * 2
+              Math.PI * 2,
             );
             ctx.fill();
 
@@ -5675,7 +5742,7 @@
               spriteHeight * 0.22,
               0,
               0,
-              Math.PI * 2
+              Math.PI * 2,
             );
             ctx.fill();
 
@@ -5695,7 +5762,7 @@
               warningGuy.radius * 0.2,
               0,
               0,
-              Math.PI * 2
+              Math.PI * 2,
             );
             ctx.fill();
 
@@ -5706,7 +5773,7 @@
               warningGuy.y,
               warningGuy.radius,
               0,
-              Math.PI * 2
+              Math.PI * 2,
             );
             ctx.fill();
           }
@@ -5821,7 +5888,7 @@
                 worldX - tileSize / 2,
                 worldY - tileSize / 2,
                 tileSize,
-                tileSize
+                tileSize,
               );
             }
           }
@@ -5861,7 +5928,7 @@
                   tileX,
                   tileY,
                   museumTileSize,
-                  museumTileSize
+                  museumTileSize,
                 );
               } else {
                 // Fallback grey floor
@@ -5882,7 +5949,7 @@
                 tileX,
                 tileY,
                 museumTileSize,
-                museumTileSize
+                museumTileSize,
               );
             }
           }
@@ -5896,7 +5963,7 @@
                 tileX,
                 tileY,
                 museumTileSize,
-                museumTileSize
+                museumTileSize,
               );
             }
           }
@@ -5910,7 +5977,7 @@
                 tileX,
                 tileY,
                 museumTileSize,
-                museumTileSize
+                museumTileSize,
               );
             }
           }
@@ -5927,7 +5994,7 @@
                   tileX,
                   tileY,
                   museumTileSize,
-                  museumTileSize
+                  museumTileSize,
                 );
               } else {
                 // Fallback door (different color)
@@ -5942,7 +6009,7 @@
                   tileX,
                   tileY,
                   museumTileSize,
-                  museumTileSize
+                  museumTileSize,
                 );
               }
             }
@@ -5969,7 +6036,7 @@
               leftCannonX,
               cannonY,
               cannonSize,
-              cannonSize
+              cannonSize,
             );
 
             // Flip the right cannon horizontally inside its tile
@@ -6018,7 +6085,7 @@
                 cannonArtifactX,
                 cannonArtifactY,
                 artifactWidth,
-                artifactHeight
+                artifactHeight,
               );
             }
           } else {
@@ -6043,7 +6110,7 @@
                 caseX - displayOffset,
                 caseY - displayOffset,
                 displaySize,
-                displaySize
+                displaySize,
               );
             } else {
               // Fallback: simple rectangle if sprite not loaded
@@ -6053,7 +6120,7 @@
                 caseX + 4 - displayOffset,
                 caseY + 4 - displayOffset,
                 displaySize - 8,
-                displaySize - 8
+                displaySize - 8,
               );
             }
 
@@ -6068,7 +6135,10 @@
                 // Special handling for Arrowhead - rotate 90 degrees
                 if (displayCase.artifact.name === 'Arrowhead') {
                   ctx.save();
-                  ctx.translate(artifactX + artifactSize / 2, artifactY + artifactSize / 2);
+                  ctx.translate(
+                    artifactX + artifactSize / 2,
+                    artifactY + artifactSize / 2,
+                  );
                   ctx.rotate(Math.PI / 2); // 90 degrees
                   ctx.imageSmoothingEnabled = false;
                   ctx.drawImage(
@@ -6076,7 +6146,7 @@
                     -artifactSize / 2,
                     -artifactSize / 2,
                     artifactSize,
-                    artifactSize
+                    artifactSize,
                   );
                   ctx.restore();
                 } else {
@@ -6085,7 +6155,7 @@
                     artifactX,
                     artifactY,
                     artifactSize,
-                    artifactSize
+                    artifactSize,
                   );
                 }
               }
@@ -6123,7 +6193,7 @@
           ctx.fillText(
             'Continue to next day?',
             panelX + panelWidth / 2,
-            panelY + 30
+            panelY + 30,
           );
 
           // Continue button (green)
@@ -6160,7 +6230,7 @@
           ctx.fillText(
             'Continue',
             continueButtonX + buttonWidth / 2,
-            buttonY + buttonHeight / 2
+            buttonY + buttonHeight / 2,
           );
 
           // Stay button (highlight when hovering)
@@ -6174,7 +6244,7 @@
           ctx.fillText(
             'Stay',
             stayButtonX + buttonWidth / 2,
-            buttonY + buttonHeight / 2
+            buttonY + buttonHeight / 2,
           );
 
           ctx.restore();
@@ -6214,7 +6284,7 @@
               player.height * 0.22,
               0,
               0,
-              Math.PI * 2
+              Math.PI * 2,
             );
             ctx.fill();
 
@@ -6279,7 +6349,7 @@
                 spriteHeight * 0.22,
                 0,
                 0,
-                Math.PI * 2
+                Math.PI * 2,
               );
               ctx.fill();
 
@@ -6298,7 +6368,7 @@
                 curator.radius * 0.2,
                 0,
                 0,
-                Math.PI * 2
+                Math.PI * 2,
               );
               ctx.fill();
 
@@ -6345,7 +6415,7 @@
                 spriteHeight * 0.22,
                 0,
                 0,
-                Math.PI * 2
+                Math.PI * 2,
               );
               ctx.fill();
 
@@ -6357,7 +6427,7 @@
                 px,
                 py,
                 spriteWidth,
-                spriteHeight
+                spriteHeight,
               );
             } else {
               // Fallback while loading (same pattern as curator)
@@ -6370,7 +6440,7 @@
                 cannonBuff.radius * 0.2,
                 0,
                 0,
-                Math.PI * 2
+                Math.PI * 2,
               );
               ctx.fill();
 
@@ -6383,7 +6453,7 @@
                 cannonBuff.y,
                 cannonBuff.radius,
                 0,
-                Math.PI * 2
+                Math.PI * 2,
               );
               ctx.fill();
               ctx.stroke();
@@ -6413,7 +6483,7 @@
           ctx.save();
           ctx.translate(
             Math.round(canvas.width / 2 - camera.x),
-            Math.round(canvas.height / 2 - camera.y)
+            Math.round(canvas.height / 2 - camera.y),
           );
 
           drawTiles();
@@ -6441,7 +6511,7 @@
             player.height * 0.22,
             0,
             0,
-            Math.PI * 2
+            Math.PI * 2,
           );
           ctx.fill();
 
@@ -6496,7 +6566,7 @@
               Math.round(player.x - player.width / 2) + 0.5,
               Math.round(player.y - player.height / 2) + 0.5,
               player.width,
-              player.height
+              player.height,
             );
             ctx.fill();
             ctx.stroke();
@@ -6524,7 +6594,7 @@
                 -starSize / 2,
                 -starSize / 2,
                 starSize,
-                starSize
+                starSize,
               );
               ctx.restore();
             }
@@ -6544,7 +6614,7 @@
                   -artifactSize / 2,
                   -artifactSize / 2,
                   artifactSize,
-                  artifactSize
+                  artifactSize,
                 );
                 ctx.restore();
               } else {
@@ -6553,7 +6623,7 @@
                   artifactX - artifactSize / 2,
                   artifactY - artifactSize / 2,
                   artifactSize,
-                  artifactSize
+                  artifactSize,
                 );
               }
             }
@@ -6639,7 +6709,7 @@
             ctx.fillText(
               'Find an artifact using the Radar',
               questX,
-              questY + 18
+              questY + 18,
             );
 
             questUIHeight = 36; // Height of quest UI (18 + 18 spacing)
@@ -6673,7 +6743,7 @@
             ctx.fillText(
               'Get a cannon for the Cannon Buff',
               questX,
-              questY + (questUIHeight === 0 ? 18 : 0)
+              questY + (questUIHeight === 0 ? 18 : 0),
             );
 
             questUIHeight += questUIHeight === 0 ? 36 : 18; // Add height for this quest
@@ -6780,19 +6850,23 @@
                   dirtX - dirtSize / 2,
                   dirtY - dirtSize / 2,
                   dirtSize,
-                  dirtSize
+                  dirtSize,
                 );
               }
 
               // Draw hot dirt sprite (fade in as redness increases)
-              if (redness > 0 && hotDirtSprite.complete && hotDirtSprite.naturalWidth > 0) {
+              if (
+                redness > 0 &&
+                hotDirtSprite.complete &&
+                hotDirtSprite.naturalWidth > 0
+              ) {
                 ctx.globalAlpha = redness;
                 ctx.drawImage(
                   hotDirtSprite,
                   dirtX - dirtSize / 2,
                   dirtY - dirtSize / 2,
                   dirtSize,
-                  dirtSize
+                  dirtSize,
                 );
               }
 
@@ -6805,7 +6879,7 @@
                   dirtX - dirtSize / 2 - 5,
                   dirtY - dirtSize / 2 - 5,
                   dirtSize + 10,
-                  dirtSize + 10
+                  dirtSize + 10,
                 );
               }
 
@@ -6823,7 +6897,7 @@
                 dirtX - dirtSize / 2,
                 dirtY - dirtSize / 2,
                 dirtSize,
-                dirtSize
+                dirtSize,
               );
               ctx.fill();
             }
@@ -6865,7 +6939,7 @@
                 brushX - brushSize / 2,
                 brushY - brushSize / 2,
                 brushSize,
-                brushSize
+                brushSize,
               );
               ctx.restore();
             } else {
@@ -6876,7 +6950,7 @@
                 brushX - brushSize / 2,
                 brushY - brushSize / 2,
                 brushSize,
-                brushSize
+                brushSize,
               );
               ctx.fill();
             }
@@ -6916,7 +6990,7 @@
               questionMarkCenterY,
               questionMarkRadius,
               0,
-              Math.PI * 2
+              Math.PI * 2,
             );
             ctx.fill();
             ctx.strokeStyle = isHoveringQuestionMark ? '#ffff66' : '#ffffff';
@@ -6946,7 +7020,7 @@
                 instructionsPanelX,
                 instructionsPanelY,
                 instructionsPanelWidth,
-                instructionsPanelHeight
+                instructionsPanelHeight,
               );
 
               // Border
@@ -6956,7 +7030,7 @@
                 instructionsPanelX,
                 instructionsPanelY,
                 instructionsPanelWidth,
-                instructionsPanelHeight
+                instructionsPanelHeight,
               );
 
               // Instructions text
@@ -7017,7 +7091,7 @@
             ctx.fillText(
               'Document Authenticity Check',
               Math.round(canvas.width / 2),
-              Math.round(panelY + 20)
+              Math.round(panelY + 20),
             );
 
             // Close button removed
@@ -7036,7 +7110,7 @@
             ctx.fillText(
               'Reference',
               Math.round(leftX + columnWidth / 2),
-              Math.round(textY - 25)
+              Math.round(textY - 25),
             );
 
             // Left column text (real excerpt)
@@ -7078,7 +7152,7 @@
             ctx.fillText(
               'Possible fake',
               Math.round(rightX + columnWidth / 2),
-              Math.round(textY - 25)
+              Math.round(textY - 25),
             );
 
             // Right column text (test excerpt)
@@ -7169,7 +7243,7 @@
                 Math.round(displayButtonX),
                 Math.round(buttonY),
                 buttonWidth,
-                buttonHeight
+                buttonHeight,
               );
               ctx.strokeStyle = '#ffffff'; // White border (no yellow on hover)
               ctx.lineWidth = 2;
@@ -7177,7 +7251,7 @@
                 Math.round(displayButtonX),
                 Math.round(buttonY),
                 buttonWidth,
-                buttonHeight
+                buttonHeight,
               );
               ctx.fillStyle = '#ffffff';
               ctx.font = 'bold 18px ui-monospace, Menlo, Consolas, monospace';
@@ -7186,7 +7260,7 @@
               ctx.fillText(
                 'Keep',
                 Math.round(displayButtonX + buttonWidth / 2),
-                Math.round(buttonY + buttonHeight / 2)
+                Math.round(buttonY + buttonHeight / 2),
               );
 
               // Throw away button (right) - brighter red
@@ -7207,7 +7281,7 @@
                 Math.round(throwAwayButtonX),
                 Math.round(buttonY),
                 buttonWidth,
-                buttonHeight
+                buttonHeight,
               );
               ctx.strokeStyle = '#ffffff'; // White border (no yellow on hover)
               ctx.lineWidth = 2;
@@ -7215,7 +7289,7 @@
                 Math.round(throwAwayButtonX),
                 Math.round(buttonY),
                 buttonWidth,
-                buttonHeight
+                buttonHeight,
               );
               ctx.fillStyle = '#ffffff';
               ctx.font = 'bold 18px ui-monospace, Menlo, Consolas, monospace';
@@ -7224,7 +7298,7 @@
               ctx.fillText(
                 'Throw away',
                 Math.round(throwAwayButtonX + buttonWidth / 2),
-                Math.round(buttonY + buttonHeight / 2)
+                Math.round(buttonY + buttonHeight / 2),
               );
             } else {
               let resultText = '';
@@ -7248,7 +7322,7 @@
               ctx.fillText(
                 resultText,
                 Math.round(canvas.width / 2),
-                Math.round(panelY + panelHeight - 60)
+                Math.round(panelY + panelHeight - 60),
               );
             }
 
@@ -7276,7 +7350,7 @@
               questionMarkCenterY,
               questionMarkRadius,
               0,
-              Math.PI * 2
+              Math.PI * 2,
             );
             ctx.fill();
             ctx.strokeStyle = isHoveringQuestionMark ? '#ffff66' : '#ffffff';
@@ -7305,7 +7379,7 @@
                 instructionsPanelX,
                 instructionsPanelY,
                 instructionsPanelWidth,
-                instructionsPanelHeight
+                instructionsPanelHeight,
               );
 
               // Border
@@ -7315,7 +7389,7 @@
                 instructionsPanelX,
                 instructionsPanelY,
                 instructionsPanelWidth,
-                instructionsPanelHeight
+                instructionsPanelHeight,
               );
 
               // Instructions text
@@ -7376,7 +7450,7 @@
             ctx.fillText(
               'Quiz',
               Math.round(canvas.width / 2),
-              Math.round(panelY + 20)
+              Math.round(panelY + 20),
             );
 
             // Question text
@@ -7406,19 +7480,28 @@
             totalQuestionHeight += 28; // Last line
             // Center question vertically in the panel (between title and buttons)
             const availableHeight = panelHeight - 100 - 120; // Title area and button area
-            let questionY = panelY + 100 + (availableHeight - totalQuestionHeight) / 2;
+            let questionY =
+              panelY + 100 + (availableHeight - totalQuestionHeight) / 2;
             for (let i = 0; i < questionWords.length; i++) {
               const testLine = questionLine + questionWords[i] + ' ';
               const metrics = ctx.measureText(testLine);
               if (metrics.width > textWidth && i > 0) {
-                ctx.fillText(questionLine, Math.round(textX), Math.round(questionY));
+                ctx.fillText(
+                  questionLine,
+                  Math.round(textX),
+                  Math.round(questionY),
+                );
                 questionLine = questionWords[i] + ' ';
                 questionY += 28;
               } else {
                 questionLine = testLine;
               }
             }
-            ctx.fillText(questionLine, Math.round(textX), Math.round(questionY));
+            ctx.fillText(
+              questionLine,
+              Math.round(textX),
+              Math.round(questionY),
+            );
 
             // Buttons
             if (!quizMinigame.answered) {
@@ -7446,7 +7529,7 @@
                 Math.round(yesButtonX),
                 Math.round(buttonY),
                 buttonWidth,
-                buttonHeight
+                buttonHeight,
               );
               ctx.strokeStyle = '#ffffff'; // White border
               ctx.lineWidth = 2;
@@ -7454,7 +7537,7 @@
                 Math.round(yesButtonX),
                 Math.round(buttonY),
                 buttonWidth,
-                buttonHeight
+                buttonHeight,
               );
               ctx.fillStyle = '#ffffff';
               ctx.font = 'bold 18px ui-monospace, Menlo, Consolas, monospace';
@@ -7463,7 +7546,7 @@
               ctx.fillText(
                 'Yes',
                 Math.round(yesButtonX + buttonWidth / 2),
-                Math.round(buttonY + buttonHeight / 2)
+                Math.round(buttonY + buttonHeight / 2),
               );
 
               // No button (right) - brighter red
@@ -7483,7 +7566,7 @@
                 Math.round(noButtonX),
                 Math.round(buttonY),
                 buttonWidth,
-                buttonHeight
+                buttonHeight,
               );
               ctx.strokeStyle = '#ffffff'; // White border
               ctx.lineWidth = 2;
@@ -7491,7 +7574,7 @@
                 Math.round(noButtonX),
                 Math.round(buttonY),
                 buttonWidth,
-                buttonHeight
+                buttonHeight,
               );
               ctx.fillStyle = '#ffffff';
               ctx.font = 'bold 18px ui-monospace, Menlo, Consolas, monospace';
@@ -7500,7 +7583,7 @@
               ctx.fillText(
                 'No',
                 Math.round(noButtonX + buttonWidth / 2),
-                Math.round(buttonY + buttonHeight / 2)
+                Math.round(buttonY + buttonHeight / 2),
               );
             } else {
               let resultText = '';
@@ -7521,7 +7604,7 @@
               ctx.fillText(
                 resultText,
                 Math.round(canvas.width / 2),
-                Math.round(panelY + panelHeight - 60)
+                Math.round(panelY + panelHeight - 60),
               );
             }
 
@@ -7535,8 +7618,10 @@
             const questionMarkRadius = questionMarkSize / 2 + 6;
             const isHoveringQuestionMark =
               mouseX >= questionMarkX - questionMarkPadding &&
-              mouseX <= questionMarkX + questionMarkSize + questionMarkPadding &&
-              mouseY >= questionMarkY - questionMarkSize - questionMarkPadding &&
+              mouseX <=
+                questionMarkX + questionMarkSize + questionMarkPadding &&
+              mouseY >=
+                questionMarkY - questionMarkSize - questionMarkPadding &&
               mouseY <= questionMarkY + questionMarkPadding;
 
             // Draw a small badge so the icon is more obvious
@@ -7547,7 +7632,7 @@
               questionMarkCenterY,
               questionMarkRadius,
               0,
-              Math.PI * 2
+              Math.PI * 2,
             );
             ctx.fill();
             ctx.strokeStyle = isHoveringQuestionMark ? '#ffff66' : '#ffffff';
@@ -7576,7 +7661,7 @@
                 instructionsPanelX,
                 instructionsPanelY,
                 instructionsPanelWidth,
-                instructionsPanelHeight
+                instructionsPanelHeight,
               );
 
               // Border
@@ -7586,7 +7671,7 @@
                 instructionsPanelX,
                 instructionsPanelY,
                 instructionsPanelWidth,
-                instructionsPanelHeight
+                instructionsPanelHeight,
               );
 
               // Instructions text
@@ -7606,8 +7691,11 @@
               // Calculate total text height to center it vertically
               const titleHeight = 30;
               const lineHeight = 22;
-              const totalTextHeight = titleHeight + (instructions.length - 1) * lineHeight;
-              const startY = instructionsPanelY + (instructionsPanelHeight - totalTextHeight) / 2;
+              const totalTextHeight =
+                titleHeight + (instructions.length - 1) * lineHeight;
+              const startY =
+                instructionsPanelY +
+                (instructionsPanelHeight - totalTextHeight) / 2;
 
               let textY = startY;
               for (let i = 0; i < instructions.length; i++) {
@@ -7696,7 +7784,7 @@
                       x + 1,
                       y + 1,
                       cellSize - 4,
-                      cellSize - 4
+                      cellSize - 4,
                     );
                   }
                   // Then draw flag sprite on top
@@ -7707,7 +7795,7 @@
                       x + 2,
                       y + 2,
                       cellSize - 6,
-                      cellSize - 6
+                      cellSize - 6,
                     );
                   } else {
                     // Fallback flag
@@ -7723,17 +7811,14 @@
                 } else if (isRevealed) {
                   if (isMine) {
                     // Draw mine sprite
-                    if (
-                      mineSprite.complete &&
-                      mineSprite.naturalWidth > 0
-                    ) {
+                    if (mineSprite.complete && mineSprite.naturalWidth > 0) {
                       ctx.imageSmoothingEnabled = false;
                       ctx.drawImage(
                         mineSprite,
                         x + 2,
                         y + 2,
                         cellSize - 4,
-                        cellSize - 4
+                        cellSize - 4,
                       );
                     } else {
                       // Fallback: draw filled circle if sprite not loaded
@@ -7744,7 +7829,7 @@
                         y + cellSize / 2,
                         cellSize / 4,
                         0,
-                        Math.PI * 2
+                        Math.PI * 2,
                       );
                       ctx.fill();
                     }
@@ -7753,7 +7838,7 @@
                     const count = countAdjacentMines(
                       minesweeperMinigame,
                       row,
-                      col
+                      col,
                     );
                     if (count > 0) {
                       ctx.fillStyle = '#000000';
@@ -7764,7 +7849,7 @@
                       ctx.fillText(
                         count.toString(),
                         x + cellSize / 2,
-                        y + cellSize / 2
+                        y + cellSize / 2,
                       );
                     }
                   }
@@ -7780,7 +7865,7 @@
                       x + 1,
                       y + 1,
                       cellSize - 4,
-                      cellSize - 4
+                      cellSize - 4,
                     );
                   }
                 }
@@ -7808,7 +7893,7 @@
               ctx.fillText(
                 minesweeperMinigame.gameOverMessage,
                 canvas.width / 2,
-                panelY + 30
+                panelY + 30,
               );
             }
 
@@ -7836,7 +7921,7 @@
               questionMarkCenterY,
               questionMarkRadius,
               0,
-              Math.PI * 2
+              Math.PI * 2,
             );
             ctx.fill();
             ctx.strokeStyle = isHoveringQuestionMark ? '#ffff66' : '#ffffff';
@@ -7866,7 +7951,7 @@
                 instructionsPanelX,
                 instructionsPanelY,
                 instructionsPanelWidth,
-                instructionsPanelHeight
+                instructionsPanelHeight,
               );
 
               // Border
@@ -7876,7 +7961,7 @@
                 instructionsPanelX,
                 instructionsPanelY,
                 instructionsPanelWidth,
-                instructionsPanelHeight
+                instructionsPanelHeight,
               );
 
               // Instructions text
@@ -7943,7 +8028,7 @@
             ctx.fillText(
               'The day is ending',
               canvas.width / 2,
-              canvas.height - 25
+              canvas.height - 25,
             );
             ctx.restore();
           }
@@ -7961,14 +8046,14 @@
             ctx.fillText(
               'The day has ended.',
               canvas.width / 2,
-              canvas.height / 2 - 40
+              canvas.height / 2 - 40,
             );
 
             ctx.font = '18px ui-monospace, Menlo, Consolas, monospace';
             ctx.fillText(
               'Press SPACE to continue',
               canvas.width / 2,
-              canvas.height / 2 + 20
+              canvas.height / 2 + 20,
             );
             ctx.restore();
           }
@@ -7986,35 +8071,57 @@
             ctx.fillText(
               'Your week is over!',
               canvas.width / 2,
-              canvas.height / 2 - 100
+              canvas.height / 2 - 100,
             );
 
             // Week end screen (museum ending rank)
             const endingRank = getMuseumEndingRank();
-            
+
             // Check and unlock ending achievements
             if (endingRank.name === 'Nothing') {
-              const nothingAchievement = achievements.list.find(a => a.id === 'nothing');
+              const nothingAchievement = achievements.list.find(
+                (a) => a.id === 'nothing',
+              );
               if (nothingAchievement && !nothingAchievement.completed) {
                 nothingAchievement.completed = true;
                 saveAchievements(); // Save achievements when unlocked
               }
             } else if (endingRank.name === 'Below Average') {
-              const consolationAchievement = achievements.list.find(a => a.id === 'consolation_prize');
+              const consolationAchievement = achievements.list.find(
+                (a) => a.id === 'consolation_prize',
+              );
               if (consolationAchievement && !consolationAchievement.completed) {
                 consolationAchievement.completed = true;
                 saveAchievements(); // Save achievements when unlocked
               }
             } else if (endingRank.name === 'Average') {
-              const classicAchievement = achievements.list.find(a => a.id === 'classic');
+              const classicAchievement = achievements.list.find(
+                (a) => a.id === 'classic',
+              );
               if (classicAchievement && !classicAchievement.completed) {
                 classicAchievement.completed = true;
                 saveAchievements(); // Save achievements when unlocked
               }
             } else if (endingRank.name === 'Above Average') {
-              const overachieverAchievement = achievements.list.find(a => a.id === 'overachiever');
-              if (overachieverAchievement && !overachieverAchievement.completed) {
+              const overachieverAchievement = achievements.list.find(
+                (a) => a.id === 'overachiever',
+              );
+              if (
+                overachieverAchievement &&
+                !overachieverAchievement.completed
+              ) {
                 overachieverAchievement.completed = true;
+                saveAchievements(); // Save achievements when unlocked
+              }
+            } else if (endingRank.name === 'Legendary') {
+              const legendaryAchievement = achievements.list.find(
+                (a) => a.id === 'legendary',
+              );
+              if (
+                legendaryAchievement &&
+                !legendaryAchievement.completed
+              ) {
+                legendaryAchievement.completed = true;
                 saveAchievements(); // Save achievements when unlocked
               }
             }
@@ -8024,7 +8131,7 @@
             ctx.fillText(
               `Ending: ${endingRank.name}`,
               canvas.width / 2,
-              canvas.height / 2 - 40
+              canvas.height / 2 - 40,
             );
 
             ctx.font = '16px ui-monospace, Menlo, Consolas, monospace';
@@ -8033,7 +8140,7 @@
               ctx.fillText(
                 reasonLines[i],
                 canvas.width / 2,
-                canvas.height / 2 - 5 + i * 20
+                canvas.height / 2 - 5 + i * 20,
               );
             }
 
@@ -8042,7 +8149,7 @@
             ctx.fillText(
               'Press SPACE to return to title',
               canvas.width / 2,
-              canvas.height / 2 + 100
+              canvas.height / 2 + 100,
             );
             ctx.restore();
           }
@@ -8107,7 +8214,7 @@
             // Check if previous tier is purchased (for tier > 1)
             if (item.tier > 1) {
               const prevTierItem = shop.items.find(
-                (i) => i.type === 'shovel' && i.tier === item.tier - 1
+                (i) => i.type === 'shovel' && i.tier === item.tier - 1,
               );
               if (prevTierItem && !prevTierItem.purchased) {
                 return; // Must buy previous tier first
@@ -8281,13 +8388,13 @@
           const dialogueText = systemMessage.text
             ? systemMessage.text
             : tutorial.active
-            ? tutorial.dialogue
-            : oldGuy.dialogue ||
-              warningGuy.dialogue ||
-              joseph.dialogue ||
-              curator.dialogue ||
-              cannonBuff.dialogue ||
-              '';
+              ? tutorial.dialogue
+              : oldGuy.dialogue ||
+                warningGuy.dialogue ||
+                joseph.dialogue ||
+                curator.dialogue ||
+                cannonBuff.dialogue ||
+                '';
           const words = dialogueText.split(' ');
           let line = '';
           // Start text below character name and line (add extra space if name exists)
@@ -8412,7 +8519,7 @@
           ctx.fillText(
             'Equipment',
             panelX + inventoryWidth / 2,
-            equipmentY - 4
+            equipmentY - 4,
           );
 
           let hoveredItemDescription = null;
@@ -8457,7 +8564,7 @@
               equipmentX,
               equipmentY,
               equipmentSlotSize,
-              equipmentSlotSize
+              equipmentSlotSize,
             );
             ctx.fill();
             ctx.stroke();
@@ -8482,7 +8589,7 @@
                   spriteX,
                   spriteY,
                   spriteSize,
-                  spriteSize
+                  spriteSize,
                 );
                 ctx.restore();
                 ctx.textBaseline = 'bottom';
@@ -8505,7 +8612,7 @@
           ctx.fillText(
             'Artifacts',
             panelX + inventoryWidth / 2,
-            artifactsLabelY - 4
+            artifactsLabelY - 4,
           );
 
           // Artifact slots grid (below equipment row)
@@ -8566,7 +8673,7 @@
                       spriteX,
                       spriteY,
                       spriteWidth,
-                      spriteHeight
+                      spriteHeight,
                     );
                   } else {
                     // Normal items use square size
@@ -8576,14 +8683,17 @@
 
                     // Special handling for Arrowhead - rotate 90 degrees
                     if (item.name === 'Arrowhead') {
-                      ctx.translate(spriteX + spriteSize / 2, spriteY + spriteSize / 2);
+                      ctx.translate(
+                        spriteX + spriteSize / 2,
+                        spriteY + spriteSize / 2,
+                      );
                       ctx.rotate(Math.PI / 2); // 90 degrees
                       ctx.drawImage(
                         item.sprite,
                         -spriteSize / 2,
                         -spriteSize / 2,
                         spriteSize,
-                        spriteSize
+                        spriteSize,
                       );
                     } else {
                       ctx.drawImage(
@@ -8591,7 +8701,7 @@
                         spriteX,
                         spriteY,
                         spriteSize,
-                        spriteSize
+                        spriteSize,
                       );
                     }
                   }
@@ -8631,7 +8741,8 @@
               // Slot outline (tier colors for artifacts)
               let outlineColor = 'rgba(255, 255, 255, 0.7)'; // Default white
               if (item && item.type === 'artifact' && item.tier) {
-                if (item.tier === 'common') outlineColor = '#9b9b9b'; // Gray
+                if (item.tier === 'common')
+                  outlineColor = '#9b9b9b'; // Gray
                 else if (item.tier === 'uncommon')
                   outlineColor = '#7dff8a'; // Light green
                 else if (item.tier === 'rare')
@@ -8654,7 +8765,7 @@
                   slotX - 2,
                   slotY - 2,
                   slotSize + 4,
-                  slotSize + 4
+                  slotSize + 4,
                 );
               }
 
@@ -8675,7 +8786,7 @@
                   slotX - 2,
                   slotY - 2,
                   slotSize + 4,
-                  slotSize + 4
+                  slotSize + 4,
                 );
               }
 
@@ -8713,7 +8824,7 @@
               finalTooltipX,
               finalTooltipY,
               tooltipWidth,
-              tooltipHeight
+              tooltipHeight,
             );
             // Use tier color for border and text if artifact has tier, otherwise white
             const tooltipColor = hoveredItemTierColor || '#ffffff';
@@ -8723,14 +8834,14 @@
               finalTooltipX,
               finalTooltipY,
               tooltipWidth,
-              tooltipHeight
+              tooltipHeight,
             );
 
             ctx.fillStyle = tooltipColor;
             ctx.fillText(
               hoveredItemDescription,
               finalTooltipX + tooltipPadding,
-              finalTooltipY + 4
+              finalTooltipY + 4,
             );
           }
 
@@ -8754,7 +8865,7 @@
             deleteButtonX,
             deleteButtonY,
             deleteButtonSize,
-            deleteButtonSize
+            deleteButtonSize,
           );
 
           // Draw red X
@@ -8765,15 +8876,15 @@
           ctx.moveTo(deleteButtonX + xPadding, deleteButtonY + xPadding);
           ctx.lineTo(
             deleteButtonX + deleteButtonSize - xPadding,
-            deleteButtonY + deleteButtonSize - xPadding
+            deleteButtonY + deleteButtonSize - xPadding,
           );
           ctx.moveTo(
             deleteButtonX + deleteButtonSize - xPadding,
-            deleteButtonY + xPadding
+            deleteButtonY + xPadding,
           );
           ctx.lineTo(
             deleteButtonX + xPadding,
-            deleteButtonY + deleteButtonSize - xPadding
+            deleteButtonY + deleteButtonSize - xPadding,
           );
           ctx.stroke();
 
@@ -8785,7 +8896,7 @@
           ctx.fillText(
             'Delete',
             deleteButtonX + deleteButtonSize / 2,
-            deleteButtonY - 4
+            deleteButtonY - 4,
           );
 
           // Instructions
@@ -8796,7 +8907,7 @@
           ctx.fillText(
             'Press E to close',
             panelX + inventoryWidth / 2,
-            panelY + inventoryHeight - 12
+            panelY + inventoryHeight - 12,
           );
 
           ctx.restore();
@@ -8882,7 +8993,7 @@
         function getMuseumEndingRank() {
           const totalCases = museum.displayCases.length;
           const filledCases = museum.displayCases.filter(
-            (displayCase) => displayCase.artifact
+            (displayCase) => displayCase.artifact,
           ).length;
           const museumArtifacts = museum.displayCases
             .filter((displayCase) => displayCase.artifact)
@@ -8913,15 +9024,15 @@
 
           // Get all artifact names in museum (excluding cannon, which is separate)
           const museumNames = new Set(
-            museumArtifacts.map((artifact) => artifact.name)
+            museumArtifacts.map((artifact) => artifact.name),
           );
 
           // Check if has all artifacts except cannon
           const artifactsWithoutCannon = ARTIFACT_NAMES.filter(
-            (name) => name !== 'Cannon'
+            (name) => name !== 'Cannon',
           );
           const hasAllArtifactsMinusCannon = artifactsWithoutCannon.every(
-            (name) => museumNames.has(name)
+            (name) => museumNames.has(name),
           );
 
           // Check if has all artifacts including cannon
@@ -8972,7 +9083,7 @@
             layout.panelX,
             layout.panelY,
             layout.panelWidth,
-            layout.panelHeight
+            layout.panelHeight,
           );
           ctx.strokeStyle = 'rgba(255, 255, 255, 0.7)';
           ctx.lineWidth = 2;
@@ -8980,7 +9091,7 @@
             layout.panelX,
             layout.panelY,
             layout.panelWidth,
-            layout.panelHeight
+            layout.panelHeight,
           );
 
           // Title/instructions (wrapped to fit panel)
@@ -8993,13 +9104,13 @@
           const instructionMaxWidth = layout.panelWidth - 16;
           const instructionLines = wrapTextLines(
             instructionText,
-            instructionMaxWidth
+            instructionMaxWidth,
           );
           for (let i = 0; i < instructionLines.length; i++) {
             ctx.fillText(
               instructionLines[i],
               layout.panelX + layout.panelWidth / 2,
-              layout.panelY + 4 + i * 16
+              layout.panelY + 4 + i * 16,
             );
           }
 
@@ -9010,7 +9121,7 @@
             ctx.fillText(
               'You have no artifacts',
               layout.panelX + layout.panelWidth / 2,
-              layout.panelY + layout.panelHeight / 2
+              layout.panelY + layout.panelHeight / 2,
             );
             ctx.restore();
             return;
@@ -9054,7 +9165,7 @@
                 slotX - 1,
                 slotY - 1,
                 layout.slotSize + 2,
-                layout.slotSize + 2
+                layout.slotSize + 2,
               );
             }
 
@@ -9089,7 +9200,7 @@
                   spriteX,
                   spriteY,
                   spriteWidth,
-                  spriteHeight
+                  spriteHeight,
                 );
               } else {
                 // Normal items use square size
@@ -9099,14 +9210,17 @@
 
                 // Special handling for Arrowhead - rotate 90 degrees
                 if (item.name === 'Arrowhead') {
-                  ctx.translate(spriteX + spriteSize / 2, spriteY + spriteSize / 2);
+                  ctx.translate(
+                    spriteX + spriteSize / 2,
+                    spriteY + spriteSize / 2,
+                  );
                   ctx.rotate(Math.PI / 2); // 90 degrees
                   ctx.drawImage(
                     item.sprite,
                     -spriteSize / 2,
                     -spriteSize / 2,
                     spriteSize,
-                    spriteSize
+                    spriteSize,
                   );
                 } else {
                   ctx.drawImage(
@@ -9114,7 +9228,7 @@
                     spriteX,
                     spriteY,
                     spriteSize,
-                    spriteSize
+                    spriteSize,
                   );
                 }
               }
@@ -9170,7 +9284,7 @@
               finalTooltipX,
               finalTooltipY,
               tooltipWidth,
-              tooltipHeight
+              tooltipHeight,
             );
             // Use tier color for border and text if artifact has tier, otherwise white
             const tooltipColor = hoveredItemTierColor || '#ffffff';
@@ -9180,13 +9294,13 @@
               finalTooltipX,
               finalTooltipY,
               tooltipWidth,
-              tooltipHeight
+              tooltipHeight,
             );
             ctx.fillStyle = tooltipColor;
             ctx.fillText(
               hoveredItemDescription,
               finalTooltipX + tooltipPadding,
-              finalTooltipY + 4
+              finalTooltipY + 4,
             );
           }
 
@@ -9212,7 +9326,7 @@
             deleteButtonX,
             deleteButtonY,
             deleteButtonSize,
-            deleteButtonSize
+            deleteButtonSize,
           );
 
           // Draw red X
@@ -9223,15 +9337,15 @@
           ctx.moveTo(deleteButtonX + xPadding, deleteButtonY + xPadding);
           ctx.lineTo(
             deleteButtonX + deleteButtonSize - xPadding,
-            deleteButtonY + deleteButtonSize - xPadding
+            deleteButtonY + deleteButtonSize - xPadding,
           );
           ctx.moveTo(
             deleteButtonX + deleteButtonSize - xPadding,
-            deleteButtonY + xPadding
+            deleteButtonY + xPadding,
           );
           ctx.lineTo(
             deleteButtonX + xPadding,
-            deleteButtonY + deleteButtonSize - xPadding
+            deleteButtonY + deleteButtonSize - xPadding,
           );
           ctx.stroke();
 
@@ -9243,7 +9357,7 @@
           ctx.fillText(
             'Delete',
             deleteButtonX + deleteButtonSize / 2,
-            deleteButtonY - 4
+            deleteButtonY - 4,
           );
 
           ctx.restore();
@@ -9274,7 +9388,7 @@
           // World space: translate so that camera is centered
           ctx.translate(
             Math.round(canvas.width / 2 - camera.x),
-            Math.round(canvas.height / 2 - camera.y)
+            Math.round(canvas.height / 2 - camera.y),
           );
 
           // Draw background elements only
@@ -9299,7 +9413,7 @@
           ctx.fillText(
             'Dig, Dig, Dig!',
             canvas.width / 2,
-            canvas.height / 2 - 80
+            canvas.height / 2 - 80,
           );
 
           // Play button
@@ -9329,21 +9443,21 @@
             btnX + buttonWidth,
             btnY,
             btnX + buttonWidth,
-            btnY + radius
+            btnY + radius,
           );
           ctx.lineTo(btnX + buttonWidth, btnY + buttonHeight - radius);
           ctx.quadraticCurveTo(
             btnX + buttonWidth,
             btnY + buttonHeight,
             btnX + buttonWidth - radius,
-            btnY + buttonHeight
+            btnY + buttonHeight,
           );
           ctx.lineTo(btnX + radius, btnY + buttonHeight);
           ctx.quadraticCurveTo(
             btnX,
             btnY + buttonHeight,
             btnX,
-            btnY + buttonHeight - radius
+            btnY + buttonHeight - radius,
           );
           ctx.lineTo(btnX, btnY + radius);
           ctx.quadraticCurveTo(btnX, btnY, btnX + radius, btnY);
@@ -9379,33 +9493,49 @@
           ctx.fillStyle = isHoveringAchievements ? '#1f2f4a' : '#15193a'; // Brighter on hover
           ctx.strokeStyle = isHoveringAchievements ? '#3b4f6f' : '#2b2f55'; // Brighter border on hover
           ctx.lineWidth = 3;
-          const achievementsBtnX = achievementsButtonX - achievementsButtonWidth / 2;
-          const achievementsBtnY = achievementsButtonY - achievementsButtonHeight / 2;
+          const achievementsBtnX =
+            achievementsButtonX - achievementsButtonWidth / 2;
+          const achievementsBtnY =
+            achievementsButtonY - achievementsButtonHeight / 2;
           ctx.beginPath();
           ctx.moveTo(achievementsBtnX + radius, achievementsBtnY);
-          ctx.lineTo(achievementsBtnX + achievementsButtonWidth - radius, achievementsBtnY);
+          ctx.lineTo(
+            achievementsBtnX + achievementsButtonWidth - radius,
+            achievementsBtnY,
+          );
           ctx.quadraticCurveTo(
             achievementsBtnX + achievementsButtonWidth,
             achievementsBtnY,
             achievementsBtnX + achievementsButtonWidth,
-            achievementsBtnY + radius
+            achievementsBtnY + radius,
           );
-          ctx.lineTo(achievementsBtnX + achievementsButtonWidth, achievementsBtnY + achievementsButtonHeight - radius);
+          ctx.lineTo(
+            achievementsBtnX + achievementsButtonWidth,
+            achievementsBtnY + achievementsButtonHeight - radius,
+          );
           ctx.quadraticCurveTo(
             achievementsBtnX + achievementsButtonWidth,
             achievementsBtnY + achievementsButtonHeight,
             achievementsBtnX + achievementsButtonWidth - radius,
-            achievementsBtnY + achievementsButtonHeight
+            achievementsBtnY + achievementsButtonHeight,
           );
-          ctx.lineTo(achievementsBtnX + radius, achievementsBtnY + achievementsButtonHeight);
+          ctx.lineTo(
+            achievementsBtnX + radius,
+            achievementsBtnY + achievementsButtonHeight,
+          );
           ctx.quadraticCurveTo(
             achievementsBtnX,
             achievementsBtnY + achievementsButtonHeight,
             achievementsBtnX,
-            achievementsBtnY + achievementsButtonHeight - radius
+            achievementsBtnY + achievementsButtonHeight - radius,
           );
           ctx.lineTo(achievementsBtnX, achievementsBtnY + radius);
-          ctx.quadraticCurveTo(achievementsBtnX, achievementsBtnY, achievementsBtnX + radius, achievementsBtnY);
+          ctx.quadraticCurveTo(
+            achievementsBtnX,
+            achievementsBtnY,
+            achievementsBtnX + radius,
+            achievementsBtnY,
+          );
           ctx.closePath();
           ctx.fill();
           ctx.stroke();
@@ -9413,7 +9543,11 @@
           // Button text
           ctx.fillStyle = '#e8eaf6';
           ctx.font = '24px ui-monospace, Menlo, Consolas, monospace';
-          ctx.fillText('Achievements', achievementsButtonX, achievementsButtonY);
+          ctx.fillText(
+            'Achievements',
+            achievementsButtonX,
+            achievementsButtonY,
+          );
 
           // Credits text
           ctx.fillStyle = '#a0a0a0'; // Lighter gray for credits
@@ -9423,7 +9557,7 @@
           ctx.fillText(
             'Made by the FLL team "Potential Error", with the help of Bernie Durfee.',
             canvas.width / 2,
-            canvas.height - 20
+            canvas.height - 20,
           );
         }
 
@@ -9452,7 +9586,7 @@
           // World space: translate so that camera is centered
           ctx.translate(
             Math.round(canvas.width / 2 - camera.x),
-            Math.round(canvas.height / 2 - camera.y)
+            Math.round(canvas.height / 2 - camera.y),
           );
 
           // Draw background elements only
@@ -9474,13 +9608,9 @@
           ctx.font = 'bold 48px ui-monospace, Menlo, Consolas, monospace';
           ctx.textAlign = 'center';
           ctx.textBaseline = 'middle';
-          ctx.fillText(
-            'Achievements',
-            canvas.width / 2,
-            60
-          );
+          ctx.fillText('Achievements', canvas.width / 2, 60);
 
-          // Back button (top left, same style as title screen)
+          // Back button (top left, same design as title screen buttons)
           const backButtonX = 50;
           const backButtonY = 30;
           const backButtonWidth = 120;
@@ -9493,28 +9623,49 @@
             mouseY >= backButtonY - backButtonHeight / 2 &&
             mouseY <= backButtonY + backButtonHeight / 2;
 
-          // Button background (rounded rectangle) - brighter when hovering
           ctx.fillStyle = isHoveringBack ? '#1f2f4a' : '#15193a';
           ctx.strokeStyle = isHoveringBack ? '#3b4f6f' : '#2b2f55';
           ctx.lineWidth = 3;
-          const backRadius = 6;
+          const backRadius = 8;
           const backBtnX = backButtonX - backButtonWidth / 2;
           const backBtnY = backButtonY - backButtonHeight / 2;
           ctx.beginPath();
           ctx.moveTo(backBtnX + backRadius, backBtnY);
           ctx.lineTo(backBtnX + backButtonWidth - backRadius, backBtnY);
-          ctx.quadraticCurveTo(backBtnX + backButtonWidth, backBtnY, backBtnX + backButtonWidth, backBtnY + backRadius);
-          ctx.lineTo(backBtnX + backButtonWidth, backBtnY + backButtonHeight - backRadius);
-          ctx.quadraticCurveTo(backBtnX + backButtonWidth, backBtnY + backButtonHeight, backBtnX + backButtonWidth - backRadius, backBtnY + backButtonHeight);
+          ctx.quadraticCurveTo(
+            backBtnX + backButtonWidth,
+            backBtnY,
+            backBtnX + backButtonWidth,
+            backBtnY + backRadius,
+          );
+          ctx.lineTo(
+            backBtnX + backButtonWidth,
+            backBtnY + backButtonHeight - backRadius,
+          );
+          ctx.quadraticCurveTo(
+            backBtnX + backButtonWidth,
+            backBtnY + backButtonHeight,
+            backBtnX + backButtonWidth - backRadius,
+            backBtnY + backButtonHeight,
+          );
           ctx.lineTo(backBtnX + backRadius, backBtnY + backButtonHeight);
-          ctx.quadraticCurveTo(backBtnX, backBtnY + backButtonHeight, backBtnX, backBtnY + backButtonHeight - backRadius);
+          ctx.quadraticCurveTo(
+            backBtnX,
+            backBtnY + backButtonHeight,
+            backBtnX,
+            backBtnY + backButtonHeight - backRadius,
+          );
           ctx.lineTo(backBtnX, backBtnY + backRadius);
-          ctx.quadraticCurveTo(backBtnX, backBtnY, backBtnX + backRadius, backBtnY);
+          ctx.quadraticCurveTo(
+            backBtnX,
+            backBtnY,
+            backBtnX + backRadius,
+            backBtnY,
+          );
           ctx.closePath();
           ctx.fill();
           ctx.stroke();
 
-          // Button text
           ctx.fillStyle = '#e8eaf6';
           ctx.font = '18px ui-monospace, Menlo, Consolas, monospace';
           ctx.fillText('Back', backButtonX, backButtonY);
@@ -9556,7 +9707,7 @@
                   trophyXPos - trophySize / 2,
                   trophyYPos - trophySize / 2,
                   trophySize,
-                  trophySize
+                  trophySize,
                 );
               } else {
                 // Draw icon as silhouette (very dark, almost black)
@@ -9567,7 +9718,7 @@
                   trophyXPos - trophySize / 2,
                   trophyYPos - trophySize / 2,
                   trophySize,
-                  trophySize
+                  trophySize,
                 );
                 // Draw icon sprite with multiply blend mode to create dark silhouette
                 ctx.globalCompositeOperation = 'multiply';
@@ -9577,7 +9728,7 @@
                   trophyXPos - trophySize / 2,
                   trophyYPos - trophySize / 2,
                   trophySize,
-                  trophySize
+                  trophySize,
                 );
                 ctx.globalCompositeOperation = 'source-over';
                 ctx.globalAlpha = 1.0;
@@ -9589,25 +9740,45 @@
                 trophyXPos - trophySize / 2,
                 trophyYPos - trophySize / 2,
                 trophySize,
-                trophySize
+                trophySize,
               );
             }
+
+            // White border around achievement icon
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(
+              trophyXPos - trophySize / 2,
+              trophyYPos - trophySize / 2,
+              trophySize,
+              trophySize,
+            );
             ctx.restore();
 
             // Draw achievement name and description
             // Names are always visible, descriptions show "???" when locked
             const nameText = achievement.name; // Always show name
-            const descText = achievement.completed ? achievement.description : '???';
+            const descText = achievement.completed
+              ? achievement.description
+              : '???';
 
             ctx.fillStyle = achievement.completed ? '#ffd700' : '#888888';
             ctx.font = 'bold 16px ui-monospace, Menlo, Consolas, monospace';
             ctx.textAlign = 'left';
             ctx.textBaseline = 'middle';
-            ctx.fillText(nameText, trophyXPos + trophySize / 2 + 10, trophyYPos - 8);
+            ctx.fillText(
+              nameText,
+              trophyXPos + trophySize / 2 + 10,
+              trophyYPos - 8,
+            );
 
             ctx.fillStyle = achievement.completed ? '#ffffff' : '#666666';
             ctx.font = '12px ui-monospace, Menlo, Consolas, monospace';
-            ctx.fillText(descText, trophyXPos + trophySize / 2 + 10, trophyYPos + 10);
+            ctx.fillText(
+              descText,
+              trophyXPos + trophySize / 2 + 10,
+              trophyYPos + 10,
+            );
           }
         }
 
@@ -9636,7 +9807,7 @@
           ctx.save();
           ctx.translate(
             Math.round(canvas.width / 2 - camera.x),
-            Math.round(canvas.height / 2 - camera.y)
+            Math.round(canvas.height / 2 - camera.y),
           );
           drawTiles();
           drawFlora();
@@ -9650,12 +9821,58 @@
           ctx.fillStyle = 'rgba(15, 26, 18, 0.85)';
           ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-          // Title
+          // Back button (same position as Achievements screen Back)
+          const backButtonX = 50;
+          const backButtonY = 30;
+          const backButtonWidth = 120;
+          const backButtonHeight = 40;
+          const isHoveringBack =
+            mouseX >= backButtonX - backButtonWidth / 2 &&
+            mouseX <= backButtonX + backButtonWidth / 2 &&
+            mouseY >= backButtonY - backButtonHeight / 2 &&
+            mouseY <= backButtonY + backButtonHeight / 2;
+          ctx.fillStyle = isHoveringBack ? '#1f2f4a' : '#15193a';
+          ctx.strokeStyle = isHoveringBack ? '#3b4f6f' : '#2b2f55';
+          ctx.lineWidth = 3;
+          const backRadius = 8;
+          const backBtnX = backButtonX - backButtonWidth / 2;
+          const backBtnY = backButtonY - backButtonHeight / 2;
+          ctx.beginPath();
+          ctx.moveTo(backBtnX + backRadius, backBtnY);
+          ctx.lineTo(backBtnX + backButtonWidth - backRadius, backBtnY);
+          ctx.quadraticCurveTo(
+            backBtnX + backButtonWidth,
+            backBtnY,
+            backBtnX + backButtonWidth,
+            backBtnY + backRadius,
+          );
+          ctx.lineTo(
+            backBtnX + backButtonWidth,
+            backBtnY + backButtonHeight - backRadius,
+          );
+          ctx.quadraticCurveTo(
+            backBtnX + backButtonWidth,
+            backBtnY + backButtonHeight,
+            backBtnX + backButtonWidth - backRadius,
+            backBtnY + backButtonHeight,
+          );
+          ctx.lineTo(backBtnX + backRadius, backBtnY + backButtonHeight);
+          ctx.quadraticCurveTo(
+            backBtnX,
+            backBtnY + backButtonHeight,
+            backBtnX,
+            backBtnY + backButtonHeight - backRadius,
+          );
+          ctx.lineTo(backBtnX, backBtnY + backRadius);
+          ctx.quadraticCurveTo(backBtnX, backBtnY, backBtnX + backRadius, backBtnY);
+          ctx.closePath();
+          ctx.fill();
+          ctx.stroke();
           ctx.fillStyle = '#e8eaf6';
-          ctx.font = 'bold 36px ui-monospace, Menlo, Consolas, monospace';
+          ctx.font = '18px ui-monospace, Menlo, Consolas, monospace';
           ctx.textAlign = 'center';
           ctx.textBaseline = 'middle';
-          ctx.fillText('Select Save Slot', canvas.width / 2, 60);
+          ctx.fillText('Back', backButtonX, backButtonY);
 
           // Draw 3 save slots
           const slotWidth = 500;
@@ -9681,12 +9898,7 @@
                 ? 'rgba(50, 60, 120, 0.9)'
                 : 'rgba(40, 50, 100, 0.8)'
               : 'rgba(30, 30, 50, 0.6)';
-            ctx.fillRect(
-              centerX - slotWidth / 2,
-              slotY,
-              slotWidth,
-              slotHeight
-            );
+            ctx.fillRect(centerX - slotWidth / 2, slotY, slotWidth, slotHeight);
 
             // Slot border
             ctx.strokeStyle = '#e8eaf6';
@@ -9695,40 +9907,42 @@
               centerX - slotWidth / 2,
               slotY,
               slotWidth,
-              slotHeight
+              slotHeight,
             );
 
-            // Slot text
+            // Slot text (vertically centered in slot rectangle)
+            const slotCenterY = slotY + slotHeight / 2;
             ctx.fillStyle = '#e8eaf6';
-            ctx.font = 'bold 20px ui-monospace, Menlo, Consolas, monospace';
             ctx.textAlign = 'left';
-            ctx.textBaseline = 'top';
+            ctx.textBaseline = 'middle';
 
             if (slotInfo) {
-              // Save exists - show info
+              // Save exists - show info (two lines centered as a block)
               const dayName =
                 dayTime.days[slotInfo.dayTime.currentDay] || 'Monday';
               const hour = slotInfo.dayTime.currentHour || 8;
               const status = slotInfo.completed ? 'Completed' : 'In Progress';
 
+              ctx.font = 'bold 20px ui-monospace, Menlo, Consolas, monospace';
               ctx.fillText(
                 `Save Slot ${i + 1}`,
                 centerX - slotWidth / 2 + 15,
-                slotY + 15
+                slotCenterY - 15,
               );
 
               ctx.font = '16px ui-monospace, Menlo, Consolas, monospace';
               ctx.fillText(
                 `${dayName}, ${hour}:00 - ${status}`,
                 centerX - slotWidth / 2 + 15,
-                slotY + 45
+                slotCenterY + 15,
               );
             } else {
-              // Empty slot
+              // Empty slot (single line centered)
+              ctx.font = 'bold 20px ui-monospace, Menlo, Consolas, monospace';
               ctx.fillText(
-                `Save Slot ${i + 1} (Empty)`,
+                `Save Slot ${i + 1}`,
                 centerX - slotWidth / 2 + 15,
-                slotY + 35
+                slotCenterY,
               );
             }
 
@@ -9754,7 +9968,7 @@
                 deleteButtonX,
                 deleteButtonY,
                 deleteButtonSize,
-                deleteButtonSize
+                deleteButtonSize,
               );
 
               // Delete button border
@@ -9764,7 +9978,7 @@
                 deleteButtonX,
                 deleteButtonY,
                 deleteButtonSize,
-                deleteButtonSize
+                deleteButtonSize,
               );
 
               // Delete button text
@@ -9775,47 +9989,10 @@
               ctx.fillText(
                 'X',
                 deleteButtonX + deleteButtonSize / 2,
-                deleteButtonY + deleteButtonSize / 2
+                deleteButtonY + deleteButtonSize / 2,
               );
             }
           }
-
-          // Back button
-          const backButtonY =
-            startY + SAVE_SLOTS * (slotHeight + slotSpacing) + 30;
-          const backButtonWidth = 150;
-          const backButtonHeight = 40;
-
-          const isHoveringBack =
-            mouseX >= centerX - backButtonWidth / 2 &&
-            mouseX <= centerX + backButtonWidth / 2 &&
-            mouseY >= backButtonY &&
-            mouseY <= backButtonY + backButtonHeight;
-
-          ctx.fillStyle = isHoveringBack
-            ? 'rgba(80, 80, 100, 0.9)'
-            : 'rgba(60, 60, 80, 0.8)';
-          ctx.fillRect(
-            centerX - backButtonWidth / 2,
-            backButtonY,
-            backButtonWidth,
-            backButtonHeight
-          );
-
-          ctx.strokeStyle = '#e8eaf6';
-          ctx.lineWidth = 2;
-          ctx.strokeRect(
-            centerX - backButtonWidth / 2,
-            backButtonY,
-            backButtonWidth,
-            backButtonHeight
-          );
-
-          ctx.fillStyle = '#e8eaf6';
-          ctx.font = '18px ui-monospace, Menlo, Consolas, monospace';
-          ctx.textAlign = 'center';
-          ctx.textBaseline = 'middle';
-          ctx.fillText('Back', centerX, backButtonY + backButtonHeight / 2);
         }
 
         // Starting screen rendering (shown while heavy setup runs)
@@ -9878,7 +10055,7 @@
           ctx.fillText(
             'Press space to continue to the game',
             canvas.width / 2,
-            canvas.height / 2 + 100
+            canvas.height / 2 + 100,
           );
         }
 
@@ -9891,7 +10068,7 @@
             const x = (e.clientX - rect.left) * scaleX;
             const y = (e.clientY - rect.top) * scaleY;
 
-            // Back button (top left)
+            // Back button (top left, same size as drawn)
             const backButtonX = 50;
             const backButtonY = 30;
             const backButtonWidth = 120;
@@ -9971,7 +10148,8 @@
 
               // Check if clicking on the slot (but not delete button)
               const deleteButtonSize = 30;
-              const deleteButtonX = centerX + slotWidth / 2 - deleteButtonSize - 10;
+              const deleteButtonX =
+                centerX + slotWidth / 2 - deleteButtonSize - 10;
               const deleteButtonY = slotY + 10;
 
               // Check delete button first (if save exists)
@@ -10012,16 +10190,16 @@
               }
             }
 
-            // Check back button
-            const backButtonY = startY + SAVE_SLOTS * (slotHeight + slotSpacing) + 30;
-            const backButtonWidth = 150;
+            // Check back button (same position as Achievements Back)
+            const backButtonX = 50;
+            const backButtonY = 30;
+            const backButtonWidth = 120;
             const backButtonHeight = 40;
-
             if (
-              x >= centerX - backButtonWidth / 2 &&
-              x <= centerX + backButtonWidth / 2 &&
-              y >= backButtonY &&
-              y <= backButtonY + backButtonHeight
+              x >= backButtonX - backButtonWidth / 2 &&
+              x <= backButtonX + backButtonWidth / 2 &&
+              y >= backButtonY - backButtonHeight / 2 &&
+              y <= backButtonY + backButtonHeight / 2
             ) {
               // Go back to title screen
               gameState = 'title';
@@ -10052,7 +10230,7 @@
               ) {
                 // Load achievements from localStorage (global, not per-save)
                 loadAchievements();
-                
+
                 // Ensure tiles are regenerated with sprites before starting
                 tileRegenerationScheduled = false;
                 doRegenerateTiles(); // Regenerate all tiles with loaded sprites
@@ -10109,7 +10287,7 @@
             ctx.fillText(
               'Error: ' + error.message,
               canvas.width / 2,
-              canvas.height / 2
+              canvas.height / 2,
             );
           }
 
