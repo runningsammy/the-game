@@ -399,14 +399,16 @@
             if (saveData.inventory) {
               inventory.slots =
                 saveData.inventory.slots || Array(25).fill(null);
-              // Restore artifact sprites (they don't serialize properly)
+              // Restore artifact sprites and tier (sprites don't serialize; tier may be missing from old saves)
               for (let i = 0; i < inventory.slots.length; i++) {
-                if (inventory.slots[i] && inventory.slots[i].name) {
-                  const sprite = getArtifactSpriteByName(
-                    inventory.slots[i].name,
-                  );
+                const slot = inventory.slots[i];
+                if (slot && slot.name) {
+                  const sprite = getArtifactSpriteByName(slot.name);
                   if (sprite) {
-                    inventory.slots[i].sprite = sprite;
+                    slot.sprite = sprite;
+                  }
+                  if (slot.type === 'artifact' && slot.tier == null) {
+                    slot.tier = getArtifactTier(slot.name);
                   }
                 }
               }
@@ -2856,14 +2858,20 @@
                   const item = inventory.slots[slotIndex];
 
                   // Check if selecting artifact for Joseph
+                  // Use item.tier or fallback to getArtifactTier so loaded saves without tier still work
+                  const effectiveTier =
+                    item.tier ||
+                    (item.type === 'artifact'
+                      ? getArtifactTier(item.name)
+                      : null);
                   if (
                     joseph.selectingArtifact &&
                     item &&
                     item.type === 'artifact' &&
                     item.name !== 'Cannon' &&
-                    (item.tier === 'rare' ||
-                      item.tier === 'super rare' ||
-                      item.tier === 'legendary')
+                    (effectiveTier === 'rare' ||
+                      effectiveTier === 'super rare' ||
+                      effectiveTier === 'legendary')
                   ) {
                     // Give artifact to Joseph and receive radar
                     inventory.slots[slotIndex] = null; // Remove from inventory
@@ -3765,14 +3773,22 @@
             joseph.dialogue = "I'll swap it with a rare or rarer artifact!";
           } else if (joseph.dialogueStage === 6) {
             // Check if player has rare or higher artifacts (excluding cannon)
+            // Use slot.tier or fallback to getArtifactTier so loaded saves without tier still work
             const rareArtifacts = inventory.slots.filter(
               (slot, index) =>
                 slot &&
                 slot.type === 'artifact' &&
                 slot.name !== 'Cannon' &&
-                (slot.tier === 'rare' ||
-                  slot.tier === 'super rare' ||
-                  slot.tier === 'legendary'),
+                (() => {
+                  const t =
+                    slot.tier ||
+                    (slot.type === 'artifact'
+                      ? getArtifactTier(slot.name)
+                      : null);
+                  return (
+                    t === 'rare' || t === 'super rare' || t === 'legendary'
+                  );
+                })(),
             );
 
             if (rareArtifacts.length > 0) {
@@ -8769,15 +8785,20 @@
                 );
               }
 
-              // Highlight eligible artifacts when selecting for Joseph
+              // Highlight eligible artifacts when selecting for Joseph (use tier or getArtifactTier fallback)
+              const josephTier =
+                item.tier ||
+                (item.type === 'artifact'
+                  ? getArtifactTier(item.name)
+                  : null);
               if (
                 joseph.selectingArtifact &&
                 item &&
                 item.type === 'artifact' &&
                 item.name !== 'Cannon' &&
-                (item.tier === 'rare' ||
-                  item.tier === 'super rare' ||
-                  item.tier === 'legendary')
+                (josephTier === 'rare' ||
+                  josephTier === 'super rare' ||
+                  josephTier === 'legendary')
               ) {
                 // Draw yellow highlight border for eligible artifacts
                 ctx.strokeStyle = '#ffff00'; // Yellow
